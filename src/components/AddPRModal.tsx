@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { X, Loader2, ChevronDown } from 'lucide-react';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { EXERCISES, type Exercise } from '@/types';
@@ -53,26 +53,54 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
     setLoading(true);
     setError('');
 
-    const docData = {
-      userId: user.uid,
-      username: user.displayName ?? 'Anonymous',
-      userAvatar: user.photoURL ?? null,
-      exerciseId: selectedExercise.id,
-      exerciseName: selectedExercise.name,
-      category: selectedExercise.category,
-      score: numScore,
-      addedWeightKg:
-        selectedExercise.category === 'weighted' && addedWeight
-          ? Number(addedWeight)
-          : null,
-      videoUrl: videoUrl.trim() || null,
-      createdAt: Timestamp.now(),
-    };
-    console.log('[AddPR] Saving doc:', JSON.stringify(docData, null, 2));
-
     try {
-      const docRef = await addDoc(collection(getClientDb(), 'records'), docData);
-      console.log('[AddPR] Saved successfully, docId:', docRef.id);
+      // Check if user already has a PR for this exercise
+      const existingQuery = query(
+        collection(getClientDb(), 'records'),
+        where('userId', '==', user.uid),
+        where('exerciseId', '==', selectedExercise.id),
+      );
+      const existingSnap = await getDocs(existingQuery);
+
+      if (!existingSnap.empty) {
+        const existingDoc = existingSnap.docs[0];
+        const existingScore = existingDoc.data().score as number;
+
+        if (numScore <= existingScore) {
+          setError(`New score must beat your current PR of ${existingScore}.`);
+          setLoading(false);
+          return;
+        }
+
+        // Update existing record
+        await updateDoc(doc(getClientDb(), 'records', existingDoc.id), {
+          score: numScore,
+          addedWeightKg:
+            selectedExercise.category === 'weighted' && addedWeight
+              ? Number(addedWeight)
+              : null,
+          videoUrl: videoUrl.trim() || null,
+          createdAt: Timestamp.now(),
+        });
+      } else {
+        // Create new record
+        await addDoc(collection(getClientDb(), 'records'), {
+          userId: user.uid,
+          username: user.displayName ?? 'Anonymous',
+          userAvatar: user.photoURL ?? null,
+          exerciseId: selectedExercise.id,
+          exerciseName: selectedExercise.name,
+          category: selectedExercise.category,
+          score: numScore,
+          addedWeightKg:
+            selectedExercise.category === 'weighted' && addedWeight
+              ? Number(addedWeight)
+              : null,
+          videoUrl: videoUrl.trim() || null,
+          createdAt: Timestamp.now(),
+        });
+      }
+
       onClose();
     } catch (err) {
       console.error('[AddPR] Firestore write failed:', err);
