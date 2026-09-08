@@ -10,8 +10,7 @@ import {
 } from 'react';
 import {
   onAuthStateChanged,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   GoogleAuthProvider,
   type User,
@@ -40,8 +39,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const auth = getClientAuth();
-    // Handle redirect result when returning from Google sign-in
-    getRedirectResult(auth).catch(() => {});
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
@@ -50,7 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginWithGoogle = useCallback(async () => {
-    await signInWithRedirect(getClientAuth(), googleProvider);
+    try {
+      await signInWithPopup(getClientAuth(), googleProvider);
+    } catch (err) {
+      console.error('Google sign-in failed:', err);
+      alert(`Sign-in failed: ${err instanceof Error ? err.message : err}`);
+    }
   }, []);
 
   const logout = useCallback(async () => {
