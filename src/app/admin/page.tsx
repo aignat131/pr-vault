@@ -10,8 +10,12 @@ import {
   addDoc,
   deleteDoc,
   updateDoc,
+  getDoc,
+  setDoc,
   doc,
   Timestamp,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore';
 import {
   ChevronLeft,
@@ -141,13 +145,22 @@ export default function AdminPage() {
 
   const handleDeleteExercise = async (exerciseId: string) => {
     try {
-      // Find the Firestore doc for this custom exercise
-      const snap = await getDocs(collection(getClientDb(), 'exercises'));
-      const docToDelete = snap.docs.find((d) => d.id === exerciseId || d.data().name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') === exerciseId);
-      if (docToDelete) {
-        await deleteDoc(doc(getClientDb(), 'exercises', docToDelete.id));
-        await refreshExercises();
+      if (defaultIds.has(exerciseId)) {
+        // Hide default exercise by adding to config/exercises.hiddenIds
+        await setDoc(
+          doc(getClientDb(), 'config', 'exercises'),
+          { hiddenIds: arrayUnion(exerciseId) },
+          { merge: true },
+        );
+      } else {
+        // Delete custom exercise from Firestore
+        const snap = await getDocs(collection(getClientDb(), 'exercises'));
+        const docToDelete = snap.docs.find((d) => d.id === exerciseId);
+        if (docToDelete) {
+          await deleteDoc(doc(getClientDb(), 'exercises', docToDelete.id));
+        }
       }
+      await refreshExercises();
     } catch (err) {
       console.error('[Admin] Failed to delete exercise:', err);
     }
@@ -286,22 +299,13 @@ export default function AdminPage() {
                         key={ex.id}
                         className="flex items-center justify-between px-4 py-3"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white/90">{ex.name}</span>
-                          {isDefault && (
-                            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-white/30">
-                              default
-                            </span>
-                          )}
-                        </div>
-                        {!isDefault && (
-                          <button
-                            onClick={() => handleDeleteExercise(ex.id)}
-                            className="rounded-full p-1.5 text-white/20 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                        <span className="text-sm text-white/90">{ex.name}</span>
+                        <button
+                          onClick={() => handleDeleteExercise(ex.id)}
+                          className="rounded-full p-1.5 text-white/20 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     );
                   })}

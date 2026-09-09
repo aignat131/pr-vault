@@ -173,6 +173,17 @@ export default function ProfilePage() {
             </button>
           ))}
         </div>
+
+        {/* Admin link */}
+        {user.email === 'aignat131@gmail.com' && (
+          <Link
+            href="/admin"
+            className="mt-4 flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
+          >
+            <Shield className="h-4 w-4" />
+            Admin Hub
+          </Link>
+        )}
       </div>
 
       {/* Stats row */}
@@ -235,17 +246,8 @@ export default function ProfilePage() {
         </section>
       )}
 
-      {/* Admin link + Sign out */}
-      <div className="flex flex-col items-center gap-3 px-5 pt-8 pb-4">
-        {user.email === 'aignat131@gmail.com' && (
-          <Link
-            href="/admin"
-            className="flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2.5 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
-          >
-            <Shield className="h-4 w-4" />
-            Admin Hub
-          </Link>
-        )}
+      {/* Sign out */}
+      <div className="flex justify-center px-5 pt-8 pb-4">
         <button
           onClick={logout}
           className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-white/60 transition-colors hover:border-red-500/30 hover:text-red-400"

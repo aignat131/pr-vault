@@ -8,7 +8,7 @@ import {
   useCallback,
   type ReactNode,
 } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { EXERCISES as DEFAULT_EXERCISES, type Exercise } from '@/types';
 
@@ -27,19 +27,34 @@ export function ExercisesProvider({ children }: { children: ReactNode }) {
 
   const loadExercises = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(getClientDb(), 'exercises'));
-      if (snap.empty) {
-        setExercises(DEFAULT_EXERCISES);
-        return;
+      // Load hidden exercise IDs
+      let hiddenIds = new Set<string>();
+      try {
+        const configSnap = await getDoc(doc(getClientDb(), 'config', 'exercises'));
+        if (configSnap.exists()) {
+          const data = configSnap.data();
+          if (Array.isArray(data.hiddenIds)) {
+            hiddenIds = new Set(data.hiddenIds);
+          }
+        }
+      } catch {
+        // ignore — config doc may not exist yet
       }
+
+      // Load custom exercises
+      const snap = await getDocs(collection(getClientDb(), 'exercises'));
       const custom = snap.docs.map((d) => ({
         id: d.id,
         name: d.data().name as string,
         category: d.data().category as Exercise['category'],
         unit: d.data().unit as Exercise['unit'],
       }));
+
+      // Merge: (defaults - hidden) + custom
       const defaultIds = new Set(DEFAULT_EXERCISES.map((e) => e.id));
-      setExercises([...DEFAULT_EXERCISES, ...custom.filter((c) => !defaultIds.has(c.id))]);
+      const visibleDefaults = DEFAULT_EXERCISES.filter((e) => !hiddenIds.has(e.id));
+      const newCustom = custom.filter((c) => !defaultIds.has(c.id));
+      setExercises([...visibleDefaults, ...newCustom]);
     } catch {
       // fallback to defaults
     }
