@@ -62,6 +62,27 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
       );
       const existingSnap = await getDocs(existingQuery);
 
+      // 1 new exercise per day limit: if this is a NEW exercise (no existing record),
+      // check if user already created a PR for a different exercise today
+      if (existingSnap.empty) {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const todayQuery = query(
+          collection(getClientDb(), 'records'),
+          where('userId', '==', user.uid),
+          where('createdAt', '>=', Timestamp.fromDate(startOfToday)),
+        );
+        const todaySnap = await getDocs(todayQuery);
+        const newPRsToday = todaySnap.docs.filter(
+          (d) => d.data().exerciseId !== selectedExercise.id,
+        );
+        if (newPRsToday.length > 0) {
+          setError('You already set a new PR today. Come back tomorrow!');
+          setLoading(false);
+          return;
+        }
+      }
+
       if (!existingSnap.empty) {
         const existingDoc = existingSnap.docs[0];
         const existingScore = existingDoc.data().score as number;
