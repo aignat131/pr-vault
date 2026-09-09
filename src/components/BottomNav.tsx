@@ -2,21 +2,27 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Trophy, Plus } from 'lucide-react';
+import { Home, Trophy, Plus, User } from 'lucide-react';
 
 interface BottomNavProps {
   onAddPress: () => void;
 }
 
-const navItems = [
+const leftItems = [
   { href: '/', icon: Home, label: 'Feed' },
   { href: '/leaderboard', icon: Trophy, label: 'Ranks' },
 ] as const;
 
+const rightItems = [
+  { href: '/profile', icon: User, label: 'Profile' },
+] as const;
+
+type NavItem = (typeof leftItems)[number] | (typeof rightItems)[number];
+
 export default function BottomNav({ onAddPress }: BottomNavProps) {
   const pathname = usePathname();
 
-  const renderItem = ({ href, icon: Icon, label }: (typeof navItems)[number]) => {
+  const renderItem = ({ href, icon: Icon, label }: NavItem) => {
     const active = pathname === href;
     return (
       <Link
@@ -37,7 +43,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
   return (
     <nav className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2">
       <div className="flex items-center gap-1 rounded-full border border-white/[0.08] bg-zinc-900/80 px-2 py-2 shadow-2xl shadow-black/40 backdrop-blur-2xl">
-        {renderItem(navItems[0])}
+        {leftItems.map(renderItem)}
 
         {/* Center add button */}
         <button
@@ -47,7 +53,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
           <Plus className="h-6 w-6" strokeWidth={3} />
         </button>
 
-        {renderItem(navItems[1])}
+        {rightItems.map(renderItem)}
       </div>
     </nav>
   );

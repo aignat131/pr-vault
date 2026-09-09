@@ -5,7 +5,8 @@ import { X, Loader2, ChevronDown } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { EXERCISES, type Exercise } from '@/types';
+import { useExercises } from '@/context/ExercisesContext';
+import type { Exercise } from '@/types';
 
 interface AddPRModalProps {
   open: boolean;
@@ -14,7 +15,8 @@ interface AddPRModalProps {
 
 export default function AddPRModal({ open, onClose }: AddPRModalProps) {
   const { user } = useAuth();
-  const [selectedExercise, setSelectedExercise] = useState<Exercise>(EXERCISES[0]);
+  const exercises = useExercises();
+  const [selectedExercise, setSelectedExercise] = useState<Exercise>(exercises[0]);
   const [score, setScore] = useState('');
   const [addedWeight, setAddedWeight] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -28,7 +30,7 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
       setAddedWeight('');
       setVideoUrl('');
       setError('');
-      setSelectedExercise(EXERCISES[0]);
+      setSelectedExercise(exercises[0]);
     }
   }, [open]);
 
@@ -93,6 +95,9 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
           return;
         }
 
+        // Read user gender from localStorage
+        const userGender = localStorage.getItem('pr-vault-user-gender') || null;
+
         // Update existing record
         await updateDoc(doc(getClientDb(), 'records', existingDoc.id), {
           score: numScore,
@@ -101,9 +106,13 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
               ? Number(addedWeight)
               : null,
           videoUrl: videoUrl.trim() || null,
+          gender: userGender,
           createdAt: Timestamp.now(),
         });
       } else {
+        // Read user gender from localStorage
+        const userGender = localStorage.getItem('pr-vault-user-gender') || null;
+
         // Create new record
         await addDoc(collection(getClientDb(), 'records'), {
           userId: user.uid,
@@ -118,6 +127,7 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
               ? Number(addedWeight)
               : null,
           videoUrl: videoUrl.trim() || null,
+          gender: userGender,
           createdAt: Timestamp.now(),
         });
       }
@@ -174,12 +184,12 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
               <select
                 value={selectedExercise.id}
                 onChange={(e) => {
-                  const ex = EXERCISES.find((x) => x.id === e.target.value);
+                  const ex = exercises.find((x) => x.id === e.target.value);
                   if (ex) setSelectedExercise(ex);
                 }}
                 className="w-full appearance-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 pr-10 text-sm text-white outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
               >
-                {EXERCISES.map((ex) => (
+                {exercises.map((ex) => (
                   <option key={ex.id} value={ex.id} className="bg-zinc-900 text-white">
                     {ex.name}
                   </option>

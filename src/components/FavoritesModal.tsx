@@ -1,7 +1,8 @@
 'use client';
 
 import { X, Star } from 'lucide-react';
-import { EXERCISES, type ExerciseCategory } from '@/types';
+import { useExercises } from '@/context/ExercisesContext';
+import type { ExerciseCategory } from '@/types';
 
 interface FavoritesModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ const categoryBadge: Record<ExerciseCategory, string> = {
 };
 
 export default function FavoritesModal({ open, onClose, favorites, onToggle }: FavoritesModalProps) {
+  const exercises = useExercises();
   if (!open) return null;
 
   const categories: ExerciseCategory[] = ['reps', 'static', 'weighted'];
@@ -59,14 +61,14 @@ export default function FavoritesModal({ open, onClose, favorites, onToggle }: F
           {/* Exercise list grouped by category */}
           <div className="space-y-5">
             {categories.map((cat) => {
-              const exercises = EXERCISES.filter((e) => e.category === cat);
+              const catExercises = exercises.filter((e) => e.category === cat);
               return (
                 <div key={cat}>
                   <span className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${categoryBadge[cat]}`}>
                     {categoryLabel[cat]}
                   </span>
                   <div className="mt-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02]">
-                    {exercises.map((ex) => {
+                    {catExercises.map((ex) => {
                       const isFav = favorites.has(ex.id);
                       return (
                         <button

@@ -10,6 +10,8 @@ export interface Exercise {
   unit: ExerciseUnit;
 }
 
+export type Gender = 'male' | 'female';
+
 export interface PRRecord {
   id?: string;
   userId: string;
@@ -21,6 +23,8 @@ export interface PRRecord {
   score: number;
   addedWeightKg?: number;
   videoUrl?: string;
+  gender?: Gender;
+  formVerified?: boolean;
   createdAt: Timestamp;
 }
 

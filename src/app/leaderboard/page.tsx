@@ -13,17 +13,14 @@ import {
 import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
-import { EXERCISES } from '@/types';
+import { useExercises } from '@/context/ExercisesContext';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
 import FavoritesModal from '@/components/FavoritesModal';
-import type { PRRecord } from '@/types';
+import type { PRRecord, Gender } from '@/types';
 
 const STORAGE_KEY = 'pr-vault-favorite-exercises';
 const DEFAULT_FAVORITES = ['pull-ups', 'muscle-ups', 'dips', 'handstand-hold', 'front-lever', 'weighted-pull-ups'];
-
-// Generate tabs from all exercises
-const ALL_TABS = EXERCISES.map((ex) => ({ id: ex.id, label: ex.name }));
 
 // Demo leaderboard data
 const DEMO_LEADERBOARD: PRRecord[] = [
@@ -87,6 +84,8 @@ const podiumIcons = [
   { icon: Award, color: 'text-amber-600', bg: 'bg-amber-600/10 ring-amber-600/30' },
 ] as const;
 
+type GenderFilter = 'all' | Gender;
+
 function formatLeaderboardScore(record: PRRecord): string {
   switch (record.category) {
     case 'reps':
@@ -99,8 +98,12 @@ function formatLeaderboardScore(record: PRRecord): string {
 }
 
 export default function LeaderboardPage() {
+  const exercises = useExercises();
+  const allTabs = exercises.map((ex) => ({ id: ex.id, label: ex.name }));
+
   const [favorites, setFavorites] = useState<Set<string>>(new Set(DEFAULT_FAVORITES));
-  const [activeTab, setActiveTab] = useState<string>(ALL_TABS[0].id);
+  const [activeTab, setActiveTab] = useState<string>(allTabs[0]?.id ?? 'pull-ups');
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>('all');
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -120,7 +123,7 @@ export default function LeaderboardPage() {
   }, []);
 
   // Sort tabs: favorites first, then rest
-  const sortedTabs = [...ALL_TABS].sort((a, b) => {
+  const sortedTabs = [...allTabs].sort((a, b) => {
     const aFav = favorites.has(a.id) ? 0 : 1;
     const bFav = favorites.has(b.id) ? 0 : 1;
     return aFav - bFav;
@@ -136,15 +139,16 @@ export default function LeaderboardPage() {
     });
   }, []);
 
-  const fetchLeaderboard = useCallback(async (exerciseId: string) => {
+  const fetchLeaderboard = useCallback(async (exerciseId: string, gender: GenderFilter) => {
     setLoading(true);
     try {
-      const q = query(
-        collection(getClientDb(), 'records'),
+      const constraints = [
         where('exerciseId', '==', exerciseId),
+        ...(gender !== 'all' ? [where('gender', '==', gender)] : []),
         orderBy('score', 'desc'),
         limit(20),
-      );
+      ];
+      const q = query(collection(getClientDb(), 'records'), ...constraints);
       const snap = await getDocs(q);
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
 
@@ -158,22 +162,22 @@ export default function LeaderboardPage() {
       }
       const deduped = Array.from(byUser.values()).sort((a, b) => b.score - a.score);
 
-      setRecords(deduped.length > 0 ? deduped : DEMO_LEADERBOARD);
+      setRecords(deduped.length > 0 ? deduped : (gender === 'all' ? DEMO_LEADERBOARD : []));
     } catch {
-      setRecords(DEMO_LEADERBOARD);
+      setRecords(gender === 'all' ? DEMO_LEADERBOARD : []);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchLeaderboard(activeTab);
-  }, [activeTab, fetchLeaderboard]);
+    fetchLeaderboard(activeTab, genderFilter);
+  }, [activeTab, genderFilter, fetchLeaderboard]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto overflow-x-hidden">
       {/* Header */}
-      <header className="px-5 pt-12 pb-2">
+      <header className="px-5 pt-8 pb-2">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -182,10 +186,7 @@ export default function LeaderboardPage() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1">
-            <p className="text-xs font-medium uppercase tracking-widest text-white/40">
-              Community
-            </p>
-            <h1 className="text-2xl font-black text-white">Leaderboards</h1>
+            <h1 className="text-xl font-black text-white">Leaderboards</h1>
           </div>
           <button
             onClick={() => setFavModalOpen(true)}
@@ -196,11 +197,28 @@ export default function LeaderboardPage() {
         </div>
       </header>
 
+      {/* Gender toggle */}
+      <div className="flex gap-1.5 px-5 mt-3">
+        {(['all', 'male', 'female'] as const).map((g) => (
+          <button
+            key={g}
+            onClick={() => setGenderFilter(g)}
+            className={`rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-200 ${
+              genderFilter === g
+                ? 'bg-white text-black'
+                : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
+            }`}
+          >
+            {g === 'all' ? 'All' : g === 'male' ? 'Men' : 'Women'}
+          </button>
+        ))}
+      </div>
+
       {/* Horizontal scrollable filter tabs */}
-      <div className="relative mt-4 mb-6">
+      <div className="relative mt-3 mb-4">
         <div
           ref={scrollRef}
-          className="flex gap-2 overflow-x-auto px-5 pb-2 scrollbar-hide"
+          className="flex gap-1.5 overflow-x-auto px-5 pb-2 scrollbar-hide"
         >
           {sortedTabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -209,7 +227,7 @@ export default function LeaderboardPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-200 ${
                   active
                     ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                     : 'bg-white/[0.05] text-white/50 hover:bg-white/10 hover:text-white/80'
@@ -230,11 +248,18 @@ export default function LeaderboardPage() {
       {/* Rankings list */}
       <section className="px-5">
         {loading ? (
-          <div className="flex justify-center py-16">
+          <div className="flex justify-center py-12">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
           </div>
+        ) : records.length === 0 ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <p className="text-sm text-white/40">No records yet</p>
+            <p className="mt-1 text-xs text-white/25">
+              Be the first to set a PR!
+            </p>
+          </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {records.map((record, i) => {
               const podium = i < 3 ? podiumIcons[i] : null;
 
@@ -248,30 +273,30 @@ export default function LeaderboardPage() {
                   }`}
                 >
                   {/* Rank */}
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center">
                     {podium ? (
                       <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-full ring-1 ${podium.bg}`}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full ring-1 ${podium.bg}`}
                       >
                         <podium.icon className={`h-4 w-4 ${podium.color}`} />
                       </div>
                     ) : (
-                      <span className="text-sm font-bold text-white/30">
+                      <span className="text-xs font-bold text-white/30">
                         {i + 1}
                       </span>
                     )}
                   </div>
 
                   {/* Avatar + name */}
-                  <div className="flex flex-1 items-center gap-3 min-w-0">
+                  <div className="flex flex-1 items-center gap-2.5 min-w-0">
                     {record.userAvatar ? (
                       <img
                         src={record.userAvatar}
                         alt={record.username}
-                        className="h-8 w-8 rounded-full"
+                        className="h-7 w-7 rounded-full"
                       />
                     ) : (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/60">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-white/60">
                         {record.username.charAt(0).toUpperCase()}
                       </div>
                     )}

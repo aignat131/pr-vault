@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers } from 'lucide-react';
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
+import { LogOut, Flame, Calendar, Layers, Shield } from 'lucide-react';
+import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { EXERCISES, type ExerciseCategory } from '@/types';
+import { useExercises } from '@/context/ExercisesContext';
+import { type ExerciseCategory, type Gender } from '@/types';
 import type { PRRecord } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
@@ -50,9 +52,32 @@ function formatMemberSince(dateStr: string | undefined): string {
 
 export default function ProfilePage() {
   const { user, loading, loginWithGoogle, logout } = useAuth();
+  const exercises = useExercises();
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [fetching, setFetching] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [gender, setGender] = useState<Gender | null>(null);
+
+  // Load user gender from Firestore
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(getClientDb(), 'users', user.uid)).then((snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.gender) {
+          setGender(data.gender);
+          localStorage.setItem('pr-vault-user-gender', data.gender);
+        }
+      }
+    }).catch(() => {});
+  }, [user]);
+
+  const updateGender = async (g: Gender) => {
+    if (!user) return;
+    setGender(g);
+    localStorage.setItem('pr-vault-user-gender', g);
+    await setDoc(doc(getClientDb(), 'users', user.uid), { gender: g }, { merge: true });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -121,7 +146,7 @@ export default function ProfilePage() {
       </header>
 
       {/* Avatar + info */}
-      <div className="flex flex-col items-center px-5 pb-6">
+      <div className="flex flex-col items-center px-5 pb-4">
         <img
           src={user.photoURL ?? ''}
           alt="avatar"
@@ -131,6 +156,23 @@ export default function ProfilePage() {
           {user.displayName ?? 'Athlete'}
         </h1>
         <p className="mt-1 text-sm text-white/40">{user.email}</p>
+
+        {/* Gender selector */}
+        <div className="mt-4 flex items-center gap-2">
+          {(['male', 'female'] as const).map((g) => (
+            <button
+              key={g}
+              onClick={() => updateGender(g)}
+              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                gender === g
+                  ? 'bg-emerald-500 text-black'
+                  : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
+              }`}
+            >
+              {g === 'male' ? 'Male' : 'Female'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats row */}
@@ -161,7 +203,7 @@ export default function ProfilePage() {
         <section className="space-y-6 px-5">
           {categories.map((cat) => {
             const style = categoryStyle[cat];
-            const exercisesInCat = EXERCISES.filter((e) => e.category === cat);
+            const exercisesInCat = exercises.filter((e) => e.category === cat);
             return (
               <div key={cat}>
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
@@ -193,8 +235,17 @@ export default function ProfilePage() {
         </section>
       )}
 
-      {/* Sign out */}
-      <div className="flex justify-center px-5 pt-8 pb-4">
+      {/* Admin link + Sign out */}
+      <div className="flex flex-col items-center gap-3 px-5 pt-8 pb-4">
+        {user.email === 'aignat131@gmail.com' && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2.5 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
+          >
+            <Shield className="h-4 w-4" />
+            Admin Hub
+          </Link>
+        )}
         <button
           onClick={logout}
           className="flex items-center gap-2 rounded-full border border-white/10 px-5 py-2.5 text-sm font-medium text-white/60 transition-colors hover:border-red-500/30 hover:text-red-400"
