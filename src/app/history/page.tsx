@@ -52,7 +52,7 @@ export default function HistoryPage() {
   }, [fetchHistory, modalOpen]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-2">
         <div className="flex items-center gap-3">

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
 import { Flame, Zap, TrendingUp } from 'lucide-react';
+import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import PRCard from '@/components/PRCard';
@@ -95,7 +96,14 @@ export default function HomePage() {
         const snap = await getDocs(q);
         if (cancelled) return;
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
-        setRecords(docs);
+        // Deduplicate by exerciseId — keep the latest (first, since ordered by createdAt desc)
+        const seen = new Set<string>();
+        const deduped = docs.filter((r) => {
+          if (seen.has(r.exerciseId)) return false;
+          seen.add(r.exerciseId);
+          return true;
+        });
+        setRecords(deduped);
         setTotalPRs(snap.size);
       } catch (err) {
         console.error('[HomePage] Firestore query failed:', err);
@@ -114,7 +122,7 @@ export default function HomePage() {
     : 'Welcome to PR Vault';
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-6">
         <div className="flex items-center justify-between">
@@ -125,11 +133,13 @@ export default function HomePage() {
             <h1 className="mt-1 text-2xl font-black text-white">{greeting}</h1>
           </div>
           {user ? (
-            <img
-              src={user.photoURL ?? ''}
-              alt="avatar"
-              className="h-10 w-10 rounded-full ring-2 ring-emerald-500/40"
-            />
+            <Link href="/profile">
+              <img
+                src={user.photoURL ?? ''}
+                alt="avatar"
+                className="h-10 w-10 rounded-full ring-2 ring-emerald-500/40 transition-opacity hover:opacity-80"
+              />
+            </Link>
           ) : (
             <button
               onClick={loginWithGoogle}

@@ -82,7 +82,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#09090b]">
+      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-lg mx-auto">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -90,7 +90,7 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 pb-28">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 pb-28 max-w-lg mx-auto">
         <h1 className="mb-2 text-2xl font-black text-white">Sign in</h1>
         <p className="mb-6 text-sm text-white/50">
           Track your calisthenics personal records
@@ -112,7 +112,7 @@ export default function ProfilePage() {
   const categoriesWithPRs = new Set(records.map((r) => r.category));
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-2">
         <p className="text-xs font-medium uppercase tracking-widest text-white/40">
