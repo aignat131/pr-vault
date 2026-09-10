@@ -122,7 +122,7 @@ export default function HomePage() {
     : 'Welcome to PR Vault';
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
+    <div className="flex min-h-dvh flex-col bg-[#09090b] pb-28 max-w-lg mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-6">
         <div className="flex items-center justify-between">
@@ -173,7 +173,7 @@ export default function HomePage() {
       )}
 
       {/* PR Feed */}
-      <section className="px-5">
+      <section className="flex-1 px-5">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/50">
           {user ? 'Your Top PRs' : 'Community Highlights'}
         </h2>

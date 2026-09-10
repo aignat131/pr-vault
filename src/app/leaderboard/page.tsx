@@ -175,7 +175,7 @@ export default function LeaderboardPage() {
   }, [activeTab, genderFilter, fetchLeaderboard]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto overflow-x-hidden">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto overflow-x-hidden w-full">
       {/* Header */}
       <header className="px-5 pt-8 pb-2">
         <div className="flex items-center gap-3">
@@ -215,7 +215,7 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Horizontal scrollable filter tabs */}
-      <div className="relative mt-3 mb-4">
+      <div className="relative mt-3 mb-4 overflow-hidden">
         <div
           ref={scrollRef}
           className="flex gap-1.5 overflow-x-auto px-5 pb-2 scrollbar-hide"
@@ -306,9 +306,9 @@ export default function LeaderboardPage() {
                   </div>
 
                   {/* Score */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <span
-                      className={`text-sm font-black ${
+                      className={`whitespace-nowrap text-sm font-black ${
                         i === 0
                           ? 'text-yellow-400'
                           : i === 1
