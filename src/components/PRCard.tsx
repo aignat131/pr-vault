@@ -1,50 +1,8 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Share2 } from 'lucide-react';
 import type { PRRecord } from '@/types';
-
-// Category-based accent colors
-const categoryStyle = {
-  reps: {
-    border: 'border-emerald-500/30',
-    glow: 'shadow-emerald-500/10',
-    accent: 'text-emerald-400',
-    badge: 'bg-emerald-500/20 text-emerald-300',
-    dot: 'bg-emerald-400',
-  },
-  static: {
-    border: 'border-cyan-500/30',
-    glow: 'shadow-cyan-500/10',
-    accent: 'text-cyan-400',
-    badge: 'bg-cyan-500/20 text-cyan-300',
-    dot: 'bg-cyan-400',
-  },
-  weighted: {
-    border: 'border-amber-500/30',
-    glow: 'shadow-amber-500/10',
-    accent: 'text-amber-400',
-    badge: 'bg-amber-500/20 text-amber-300',
-    dot: 'bg-amber-400',
-  },
-} as const;
-
-function formatScore(record: PRRecord): string {
-  switch (record.category) {
-    case 'reps':
-      return `${record.score} REPS`;
-    case 'static':
-      return `${record.score}s`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
-  }
-}
-
-function formatDate(timestamp: { seconds: number }): string {
-  return new Date(timestamp.seconds * 1000).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
-}
+import { categoryStyle, formatScoreUpper as formatScoreDisplay, formatScore, formatDate } from '@/lib/utils';
 
 interface PRCardProps {
   record: PRRecord;
@@ -62,8 +20,15 @@ export default function PRCard({ record }: PRCardProps) {
         transition-all duration-300 hover:scale-[1.02] hover:bg-white/[0.06]
       `}
     >
-      {/* Category indicator dot */}
-      <div className={`absolute top-4 right-4 h-2 w-2 rounded-full ${style.dot}`} />
+      {/* Category indicator dot + NEW badge */}
+      <div className="absolute top-4 right-4 flex items-center gap-1.5">
+        {record.isNewPR && (
+          <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+            New
+          </span>
+        )}
+        <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+      </div>
 
       {/* Header: user info */}
       <div className="flex items-center gap-3 mb-3">
@@ -95,10 +60,10 @@ export default function PRCard({ record }: PRCardProps) {
 
       {/* Score */}
       <p className={`text-3xl font-black tracking-tight ${style.accent}`}>
-        {formatScore(record)}
+        {formatScoreDisplay(record)}
       </p>
 
-      {/* Category badge + video proof */}
+      {/* Category badge + actions */}
       <div className="mt-3 flex items-center justify-between">
         <span
           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style.badge}`}
@@ -106,17 +71,32 @@ export default function PRCard({ record }: PRCardProps) {
           {record.category}
         </span>
 
-        {record.videoUrl && (
-          <a
-            href={record.videoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
+        <div className="flex items-center gap-1.5">
+          {record.videoUrl && (
+            <a
+              href={record.videoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-full bg-white/5 px-2.5 py-1 text-[10px] font-medium text-white/60 transition-colors hover:bg-white/10 hover:text-white/90"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Proof
+            </a>
+          )}
+          <button
+            onClick={() => {
+              const text = `${record.username} hit ${formatScore(record)} on ${record.exerciseName}!`;
+              if (navigator.share) {
+                navigator.share({ text }).catch(() => {});
+              } else {
+                navigator.clipboard.writeText(text);
+              }
+            }}
+            className="rounded-full bg-white/5 p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
           >
-            <ExternalLink className="h-3 w-3" />
-            Proof
-          </a>
-        )}
+            <Share2 className="h-3 w-3" />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   query,
@@ -10,7 +10,7 @@ import {
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
-import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star } from 'lucide-react';
+import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useExercises } from '@/context/ExercisesContext';
@@ -18,8 +18,8 @@ import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
 import FavoritesModal from '@/components/FavoritesModal';
 import type { PRRecord, Gender } from '@/types';
+import { STORAGE_KEYS } from '@/lib/constants';
 
-const STORAGE_KEY = 'pr-vault-favorite-exercises';
 const DEFAULT_FAVORITES = ['pull-ups', 'muscle-ups', 'dips', 'handstand-hold', 'front-lever', 'weighted-pull-ups'];
 
 // Demo leaderboard data
@@ -108,12 +108,11 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [favModalOpen, setFavModalOpen] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load favorites from localStorage
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEYS.FAVORITES);
       if (stored) {
         setFavorites(new Set(JSON.parse(stored)));
       }
@@ -134,7 +133,7 @@ export default function LeaderboardPage() {
       const next = new Set(prev);
       if (next.has(exerciseId)) next.delete(exerciseId);
       else next.add(exerciseId);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify([...next]));
       return next;
     });
   }, []);
@@ -146,7 +145,7 @@ export default function LeaderboardPage() {
         where('exerciseId', '==', exerciseId),
         ...(gender !== 'all' ? [where('gender', '==', gender)] : []),
         orderBy('score', 'desc'),
-        limit(20),
+        limit(50),
       ];
       const q = query(collection(getClientDb(), 'records'), ...constraints);
       const snap = await getDocs(q);
@@ -217,7 +216,6 @@ export default function LeaderboardPage() {
       {/* Horizontal scrollable filter tabs */}
       <div className="relative mt-3 mb-4 overflow-hidden">
         <div
-          ref={scrollRef}
           className="flex gap-1.5 overflow-x-auto px-5 pb-2 scrollbar-hide"
         >
           {sortedTabs.map((tab) => {
@@ -307,6 +305,9 @@ export default function LeaderboardPage() {
 
                   {/* Score */}
                   <div className="flex shrink-0 items-center gap-2">
+                    {record.formVerified === true && (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    )}
                     <span
                       className={`whitespace-nowrap text-sm font-black ${
                         i === 0

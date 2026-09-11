@@ -3,6 +3,7 @@
 import { X, Star } from 'lucide-react';
 import { useExercises } from '@/context/ExercisesContext';
 import type { ExerciseCategory } from '@/types';
+import { categoryStyle } from '@/lib/utils';
 
 interface FavoritesModalProps {
   open: boolean;
@@ -10,18 +11,6 @@ interface FavoritesModalProps {
   favorites: Set<string>;
   onToggle: (exerciseId: string) => void;
 }
-
-const categoryLabel: Record<ExerciseCategory, string> = {
-  reps: 'Reps',
-  static: 'Static',
-  weighted: 'Weighted',
-};
-
-const categoryBadge: Record<ExerciseCategory, string> = {
-  reps: 'bg-emerald-500/20 text-emerald-300',
-  static: 'bg-cyan-500/20 text-cyan-300',
-  weighted: 'bg-amber-500/20 text-amber-300',
-};
 
 export default function FavoritesModal({ open, onClose, favorites, onToggle }: FavoritesModalProps) {
   const exercises = useExercises();
@@ -64,8 +53,8 @@ export default function FavoritesModal({ open, onClose, favorites, onToggle }: F
               const catExercises = exercises.filter((e) => e.category === cat);
               return (
                 <div key={cat}>
-                  <span className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${categoryBadge[cat]}`}>
-                    {categoryLabel[cat]}
+                  <span className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${categoryStyle[cat].badge}`}>
+                    {categoryStyle[cat].label}
                   </span>
                   <div className="mt-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02]">
                     {catExercises.map((ex) => {

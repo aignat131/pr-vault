@@ -29,6 +29,7 @@ export default function HistoryPage() {
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -49,7 +50,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     fetchHistory();
-  }, [fetchHistory, modalOpen]);
+  }, [fetchHistory, refreshKey]);
 
   return (
     <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
@@ -99,7 +100,7 @@ export default function HistoryPage() {
       </section>
 
       <BottomNav onAddPress={() => setModalOpen(true)} />
-      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={() => setRefreshKey((k) => k + 1)} />
     </div>
   );
 }

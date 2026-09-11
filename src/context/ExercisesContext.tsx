@@ -44,10 +44,11 @@ export function ExercisesProvider({ children }: { children: ReactNode }) {
       // Load custom exercises
       const snap = await getDocs(collection(getClientDb(), 'exercises'));
       const custom = snap.docs.map((d) => ({
-        id: d.id,
+        id: d.data().id ?? d.id,
         name: d.data().name as string,
         category: d.data().category as Exercise['category'],
         unit: d.data().unit as Exercise['unit'],
+        firestoreDocId: d.id,
       }));
 
       // Merge: (defaults - hidden) + custom
@@ -55,8 +56,8 @@ export function ExercisesProvider({ children }: { children: ReactNode }) {
       const visibleDefaults = DEFAULT_EXERCISES.filter((e) => !hiddenIds.has(e.id));
       const newCustom = custom.filter((c) => !defaultIds.has(c.id));
       setExercises([...visibleDefaults, ...newCustom]);
-    } catch {
-      // fallback to defaults
+    } catch (err) {
+      console.error('[Exercises] Failed to load exercises:', err);
     }
   }, []);
 

@@ -8,6 +8,7 @@ export interface Exercise {
   name: string;
   category: ExerciseCategory;
   unit: ExerciseUnit;
+  firestoreDocId?: string; // Firestore document ID for custom exercises
 }
 
 export type Gender = 'male' | 'female';
@@ -25,6 +26,7 @@ export interface PRRecord {
   videoUrl?: string;
   gender?: Gender;
   formVerified?: boolean;
+  isNewPR?: boolean;
   createdAt: Timestamp;
 }
 
@@ -33,7 +35,6 @@ export interface UserProfile {
   username: string;
   email: string;
   photoURL: string;
-  bodyweightKg?: number;
 }
 
 // Predefined exercises for the app

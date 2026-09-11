@@ -34,8 +34,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useExercisesContext } from '@/context/ExercisesContext';
 import { EXERCISES as DEFAULT_EXERCISES, type ExerciseCategory } from '@/types';
 import type { PRRecord } from '@/types';
-
-const ADMIN_EMAIL = 'aignat131@gmail.com';
+import { formatScore, formatDateFull as formatDate, categoryStyle } from '@/lib/utils';
+import { ADMIN_EMAIL } from '@/lib/constants';
 
 const categoryOptions: { value: ExerciseCategory; label: string; unit: string }[] = [
   { value: 'reps', label: 'Reps', unit: 'reps' },
@@ -43,32 +43,7 @@ const categoryOptions: { value: ExerciseCategory; label: string; unit: string }[
   { value: 'weighted', label: 'Weighted', unit: 'kg' },
 ];
 
-const categoryBadge: Record<ExerciseCategory, string> = {
-  reps: 'bg-emerald-500/20 text-emerald-300',
-  static: 'bg-cyan-500/20 text-cyan-300',
-  weighted: 'bg-amber-500/20 text-amber-300',
-};
-
 type Tab = 'exercises' | 'review';
-
-function formatScore(record: PRRecord): string {
-  switch (record.category) {
-    case 'reps':
-      return `${record.score} reps`;
-    case 'static':
-      return `${record.score}s`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
-  }
-}
-
-function formatDate(ts: { seconds: number }): string {
-  return new Date(ts.seconds * 1000).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -153,12 +128,10 @@ export default function AdminPage() {
           { merge: true },
         );
       } else {
-        // Delete custom exercise from Firestore
-        const snap = await getDocs(collection(getClientDb(), 'exercises'));
-        const docToDelete = snap.docs.find((d) => d.id === exerciseId);
-        if (docToDelete) {
-          await deleteDoc(doc(getClientDb(), 'exercises', docToDelete.id));
-        }
+        // Delete custom exercise from Firestore using stored doc ID
+        const exercise = exercises.find((e) => e.id === exerciseId);
+        const docId = exercise?.firestoreDocId ?? exerciseId;
+        await deleteDoc(doc(getClientDb(), 'exercises', docId));
       }
       await refreshExercises();
     } catch (err) {
@@ -288,7 +261,7 @@ export default function AdminPage() {
             if (catExercises.length === 0) return null;
             return (
               <div key={cat}>
-                <span className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${categoryBadge[cat]}`}>
+                <span className={`mb-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${categoryStyle[cat].badge}`}>
                   {cat}
                 </span>
                 <div className="mt-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02]">

@@ -6,17 +6,21 @@ import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } 
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
+import { STORAGE_KEYS } from '@/lib/constants';
+import confetti from 'canvas-confetti';
 import type { Exercise } from '@/types';
 
 interface AddPRModalProps {
   open: boolean;
   onClose: () => void;
+  onSave?: () => void;
+  gender?: string | null;
 }
 
-export default function AddPRModal({ open, onClose }: AddPRModalProps) {
+export default function AddPRModal({ open, onClose, onSave, gender: genderProp }: AddPRModalProps) {
   const { user } = useAuth();
   const exercises = useExercises();
-  const [selectedExercise, setSelectedExercise] = useState<Exercise>(exercises[0]);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(exercises[0] ?? null);
   const [score, setScore] = useState('');
   const [addedWeight, setAddedWeight] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
@@ -30,25 +34,24 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
       setAddedWeight('');
       setVideoUrl('');
       setError('');
-      setSelectedExercise(exercises[0]);
+      setSelectedExercise(exercises[0] ?? null);
     }
-  }, [open]);
+  }, [open, exercises]);
 
   const handleSubmit = useCallback(async () => {
-    console.log('[AddPR] handleSubmit called');
-    console.log('[AddPR] user:', user?.uid, user?.email);
-    console.log('[AddPR] score:', score, 'exercise:', selectedExercise.id);
-
     if (!user) {
       setError('You must be logged in to add a PR.');
-      console.log('[AddPR] No user, aborting');
+      return;
+    }
+
+    if (!selectedExercise) {
+      setError('No exercises available.');
       return;
     }
 
     const numScore = Number(score);
     if (!score || isNaN(numScore) || numScore <= 0) {
       setError('Enter a valid score.');
-      console.log('[AddPR] Invalid score, aborting');
       return;
     }
 
@@ -95,8 +98,7 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
           return;
         }
 
-        // Read user gender from localStorage
-        const userGender = localStorage.getItem('pr-vault-user-gender') || null;
+        const userGender = genderProp ?? localStorage.getItem(STORAGE_KEYS.GENDER) ?? null;
 
         // Update existing record
         await updateDoc(doc(getClientDb(), 'records', existingDoc.id), {
@@ -110,8 +112,7 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
           createdAt: Timestamp.now(),
         });
       } else {
-        // Read user gender from localStorage
-        const userGender = localStorage.getItem('pr-vault-user-gender') || null;
+        const userGender = genderProp ?? localStorage.getItem(STORAGE_KEYS.GENDER) ?? null;
 
         // Create new record
         await addDoc(collection(getClientDb(), 'records'), {
@@ -128,10 +129,13 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
               : null,
           videoUrl: videoUrl.trim() || null,
           gender: userGender,
+          isNewPR: true,
           createdAt: Timestamp.now(),
         });
       }
 
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+      onSave?.();
       onClose();
     } catch (err) {
       console.error('[AddPR] Firestore write failed:', err);
@@ -139,9 +143,21 @@ export default function AddPRModal({ open, onClose }: AddPRModalProps) {
     } finally {
       setLoading(false);
     }
-  }, [user, score, addedWeight, videoUrl, selectedExercise, onClose]);
+  }, [user, score, addedWeight, videoUrl, selectedExercise, onClose, onSave, genderProp]);
 
   if (!open) return null;
+  if (!selectedExercise) {
+    return (
+      <>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-lg mx-auto">
+          <div className="rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl text-center">
+            <p className="py-8 text-sm text-white/50">No exercises available.</p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const scoreLabel =
     selectedExercise.category === 'reps'

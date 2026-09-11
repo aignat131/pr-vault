@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers, Shield } from 'lucide-react';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { LogOut, Flame, Calendar, Layers, Shield, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -11,38 +11,8 @@ import { type ExerciseCategory, type Gender } from '@/types';
 import type { PRRecord } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
-
-const categoryStyle = {
-  reps: {
-    accent: 'text-emerald-400',
-    badge: 'bg-emerald-500/20 text-emerald-300',
-    border: 'border-emerald-500/20',
-    label: 'Reps',
-  },
-  static: {
-    accent: 'text-cyan-400',
-    badge: 'bg-cyan-500/20 text-cyan-300',
-    border: 'border-cyan-500/20',
-    label: 'Static',
-  },
-  weighted: {
-    accent: 'text-amber-400',
-    badge: 'bg-amber-500/20 text-amber-300',
-    border: 'border-amber-500/20',
-    label: 'Weighted',
-  },
-} as const;
-
-function formatScore(record: PRRecord): string {
-  switch (record.category) {
-    case 'reps':
-      return `${record.score} reps`;
-    case 'static':
-      return `${record.score}s`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
-  }
-}
+import { categoryStyle, formatScore } from '@/lib/utils';
+import { ADMIN_EMAIL, STORAGE_KEYS } from '@/lib/constants';
 
 function formatMemberSince(dateStr: string | undefined): string {
   if (!dateStr) return '—';
@@ -57,6 +27,21 @@ export default function ProfilePage() {
   const [fetching, setFetching] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [gender, setGender] = useState<Gender | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deletePR = async (recordId: string) => {
+    if (!confirm('Delete this PR? This cannot be undone.')) return;
+    setDeletingId(recordId);
+    try {
+      await deleteDoc(doc(getClientDb(), 'records', recordId));
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('[Profile] Failed to delete PR:', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // Load user gender from Firestore
   useEffect(() => {
@@ -66,16 +51,16 @@ export default function ProfilePage() {
         const data = snap.data();
         if (data.gender) {
           setGender(data.gender);
-          localStorage.setItem('pr-vault-user-gender', data.gender);
+          localStorage.setItem(STORAGE_KEYS.GENDER, data.gender);
         }
       }
-    }).catch(() => {});
+    }).catch((err) => console.error('[Profile] Failed to load gender:', err));
   }, [user]);
 
   const updateGender = async (g: Gender) => {
     if (!user) return;
     setGender(g);
-    localStorage.setItem('pr-vault-user-gender', g);
+    localStorage.setItem(STORAGE_KEYS.GENDER, g);
     await setDoc(doc(getClientDb(), 'users', user.uid), { gender: g }, { merge: true });
   };
 
@@ -103,7 +88,7 @@ export default function ProfilePage() {
     }
     fetchRecords();
     return () => { cancelled = true; };
-  }, [user, modalOpen]);
+  }, [user, refreshKey]);
 
   if (loading) {
     return (
@@ -175,7 +160,7 @@ export default function ProfilePage() {
         </div>
 
         {/* Admin link */}
-        {user.email === 'aignat131@gmail.com' && (
+        {user.email === ADMIN_EMAIL && (
           <Link
             href="/admin"
             className="mt-4 flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
@@ -233,9 +218,20 @@ export default function ProfilePage() {
                         <span className={`text-sm ${pr ? 'text-white/90' : 'text-white/25'}`}>
                           {ex.name}
                         </span>
-                        <span className={`text-sm font-bold ${pr ? style.accent : 'text-white/20'}`}>
-                          {pr ? formatScore(pr) : '—'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold ${pr ? style.accent : 'text-white/20'}`}>
+                            {pr ? formatScore(pr) : '—'}
+                          </span>
+                          {pr?.id && (
+                            <button
+                              onClick={() => deletePR(pr.id!)}
+                              disabled={deletingId === pr.id}
+                              className="rounded-full p-1 text-white/15 transition-colors hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -258,7 +254,7 @@ export default function ProfilePage() {
       </div>
 
       <BottomNav onAddPress={() => setModalOpen(true)} />
-      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={() => setRefreshKey((k) => k + 1)} gender={gender} />
     </div>
   );
 }

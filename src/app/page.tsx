@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, Timestamp } from 'firebase/firestore';
 import { Flame, Zap, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
@@ -74,6 +74,7 @@ export default function HomePage() {
   const [totalPRs, setTotalPRs] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Fetch user's PRs
   useEffect(() => {
@@ -87,11 +88,11 @@ export default function HomePage() {
     async function fetchRecords() {
       setFetching(true);
       try {
+        // Fetch all user records for accurate count, ordered for display
         const q = query(
           collection(getClientDb(), 'records'),
           where('userId', '==', user!.uid),
           orderBy('createdAt', 'desc'),
-          limit(5),
         );
         const snap = await getDocs(q);
         if (cancelled) return;
@@ -103,8 +104,8 @@ export default function HomePage() {
           seen.add(r.exerciseId);
           return true;
         });
-        setRecords(deduped);
-        setTotalPRs(snap.size);
+        setRecords(deduped.slice(0, 5));
+        setTotalPRs(deduped.length);
       } catch (err) {
         console.error('[HomePage] Firestore query failed:', err);
       } finally {
@@ -114,7 +115,7 @@ export default function HomePage() {
 
     fetchRecords();
     return () => { cancelled = true; };
-  }, [user, modalOpen]); // refetch after modal closes
+  }, [user, refreshKey]);
 
   const displayRecords = user ? records : DEMO_RECORDS;
   const greeting = user
@@ -199,7 +200,7 @@ export default function HomePage() {
 
       {/* Bottom Nav + Modal */}
       <BottomNav onAddPress={() => setModalOpen(true)} />
-      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={() => setRefreshKey((k) => k + 1)} />
     </div>
   );
 }

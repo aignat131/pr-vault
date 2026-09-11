@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   title: "PR Vault — Calisthenics Personal Records",
   description:
     "Track and share your calisthenics personal records. Pull-ups, muscle-ups, levers, and more.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "PR Vault",
+  },
 };
 
 export const viewport: Viewport = {
