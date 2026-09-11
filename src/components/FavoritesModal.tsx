@@ -27,7 +27,7 @@ export default function FavoritesModal({ open, onClose, favorites, onToggle }: F
       />
 
       {/* Bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-lg mx-auto">
+      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-2xl mx-auto">
         <div className="max-h-[75dvh] overflow-y-auto rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl">
           {/* Drag handle */}
           <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-white/20" />

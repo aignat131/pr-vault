@@ -9,7 +9,7 @@ interface BottomNavProps {
 }
 
 const leftItems = [
-  { href: '/', icon: Home, label: 'Feed' },
+  { href: '/', icon: Home, label: 'Home' },
   { href: '/leaderboard', icon: Trophy, label: 'Ranks' },
 ] as const;
 

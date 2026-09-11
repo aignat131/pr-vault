@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers, Shield, Trash2 } from 'lucide-react';
+import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -29,6 +29,23 @@ export default function ProfilePage() {
   const [gender, setGender] = useState<Gender | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleInvite = async () => {
+    const url = window.location.origin;
+    const text = `Join me on PR Vault and track your calisthenics personal records!`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'PR Vault', text, url });
+      } catch {
+        // user cancelled share
+      }
+    } else {
+      await navigator.clipboard.writeText(`${text} ${url}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const deletePR = async (recordId: string) => {
     if (!confirm('Delete this PR? This cannot be undone.')) return;
@@ -92,7 +109,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-lg mx-auto">
+      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-2xl mx-auto">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -100,7 +117,7 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 pb-28 max-w-lg mx-auto">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 pb-28 max-w-2xl mx-auto">
         <h1 className="mb-2 text-2xl font-black text-white">Sign in</h1>
         <p className="mb-6 text-sm text-white/50">
           Track your calisthenics personal records
@@ -122,9 +139,9 @@ export default function ProfilePage() {
   const categoriesWithPRs = new Set(records.map((r) => r.category));
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
       {/* Header */}
-      <header className="px-5 pt-12 pb-2">
+      <header className="px-5 pt-12 pb-2 md:px-8">
         <p className="text-xs font-medium uppercase tracking-widest text-white/40">
           Profile
         </p>
@@ -172,7 +189,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Stats row */}
-      <section className="mb-6 grid grid-cols-3 gap-3 px-5">
+      <section className="mb-6 grid grid-cols-3 gap-3 px-5 md:px-8 md:gap-4">
         <StatCard
           icon={<Flame className="h-4 w-4 text-emerald-400" />}
           value={String(records.length)}
@@ -196,7 +213,7 @@ export default function ProfilePage() {
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
         </div>
       ) : (
-        <section className="space-y-6 px-5">
+        <section className="space-y-6 px-5 md:px-8">
           {categories.map((cat) => {
             const style = categoryStyle[cat];
             const exercisesInCat = exercises.filter((e) => e.category === cat);
@@ -241,6 +258,39 @@ export default function ProfilePage() {
           })}
         </section>
       )}
+
+      {/* Invite Friends */}
+      <div className="mx-5 mt-8 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 md:mx-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10">
+            <Link2 className="h-5 w-5 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">Invite Friends</p>
+            <p className="text-xs text-white/40">Share the app with your training partners</p>
+          </div>
+          <button
+            onClick={handleInvite}
+            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+              copied
+                ? 'bg-emerald-500 text-black'
+                : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.12] hover:text-white'
+            }`}
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Share2 className="h-3.5 w-3.5" />
+                Share
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
       {/* Sign out */}
       <div className="flex justify-center px-5 pt-8 pb-4">

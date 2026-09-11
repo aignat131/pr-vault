@@ -5,7 +5,7 @@ export function formatScore(record: PRRecord): string {
     case 'reps':
       return `${record.score} reps`;
     case 'static':
-      return `${record.score}s`;
+      return `${record.score} sec`;
     case 'weighted':
       return `+${record.addedWeightKg ?? record.score}kg`;
   }
@@ -16,7 +16,7 @@ export function formatScoreUpper(record: PRRecord): string {
     case 'reps':
       return `${record.score} REPS`;
     case 'static':
-      return `${record.score}s`;
+      return `${record.score} SEC`;
     case 'weighted':
       return `+${record.addedWeightKg ?? record.score}kg`;
   }

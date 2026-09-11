@@ -155,7 +155,7 @@ export default function AdminPage() {
   // Auth gate
   if (authLoading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-lg mx-auto">
+      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-2xl mx-auto">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -163,7 +163,7 @@ export default function AdminPage() {
 
   if (!user || user.email !== ADMIN_EMAIL) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 max-w-lg mx-auto">
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 max-w-2xl mx-auto">
         <h1 className="mb-2 text-xl font-black text-white">Access Denied</h1>
         <p className="mb-6 text-sm text-white/50">
           This page is restricted to administrators.
@@ -179,7 +179,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-12 max-w-lg mx-auto">
+    <div className="min-h-dvh bg-[#09090b] pb-12 max-w-2xl mx-auto">
       {/* Header */}
       <header className="px-5 pt-8 pb-2">
         <div className="flex items-center gap-3">

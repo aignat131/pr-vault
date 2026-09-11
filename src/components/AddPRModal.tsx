@@ -150,7 +150,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
     return (
       <>
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-        <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-lg mx-auto">
+        <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-2xl mx-auto">
           <div className="rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl text-center">
             <p className="py-8 text-sm text-white/50">No exercises available.</p>
           </div>
@@ -175,7 +175,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
       />
 
       {/* Bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-lg mx-auto">
+      <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-2xl mx-auto">
         <div className="rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl">
           {/* Drag handle */}
           <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-white/20" />

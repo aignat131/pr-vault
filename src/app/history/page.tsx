@@ -53,9 +53,9 @@ export default function HistoryPage() {
   }, [fetchHistory, refreshKey]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
       {/* Header */}
-      <header className="px-5 pt-12 pb-2">
+      <header className="px-5 pt-12 pb-2 md:px-8">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -73,7 +73,7 @@ export default function HistoryPage() {
       </header>
 
       {/* Activity feed */}
-      <section className="mt-4 px-5">
+      <section className="mt-4 px-5 md:px-8">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />

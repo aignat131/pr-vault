@@ -8,7 +8,6 @@ import {
   orderBy,
   limit,
   getDocs,
-  Timestamp,
 } from 'firebase/firestore';
 import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
@@ -21,62 +20,6 @@ import type { PRRecord, Gender } from '@/types';
 import { STORAGE_KEYS } from '@/lib/constants';
 
 const DEFAULT_FAVORITES = ['pull-ups', 'muscle-ups', 'dips', 'handstand-hold', 'front-lever', 'weighted-pull-ups'];
-
-// Demo leaderboard data
-const DEMO_LEADERBOARD: PRRecord[] = [
-  {
-    id: 'lb-1',
-    userId: 'd1',
-    username: 'Alex K.',
-    exerciseId: 'pull-ups',
-    exerciseName: 'Pull-ups',
-    category: 'reps',
-    score: 35,
-    videoUrl: 'https://youtube.com',
-    createdAt: Timestamp.fromDate(new Date('2026-09-01')),
-  },
-  {
-    id: 'lb-2',
-    userId: 'd2',
-    username: 'Maya R.',
-    exerciseId: 'pull-ups',
-    exerciseName: 'Pull-ups',
-    category: 'reps',
-    score: 30,
-    createdAt: Timestamp.fromDate(new Date('2026-09-02')),
-  },
-  {
-    id: 'lb-3',
-    userId: 'd3',
-    username: 'Jordan T.',
-    exerciseId: 'pull-ups',
-    exerciseName: 'Pull-ups',
-    category: 'reps',
-    score: 28,
-    videoUrl: 'https://instagram.com',
-    createdAt: Timestamp.fromDate(new Date('2026-09-03')),
-  },
-  {
-    id: 'lb-4',
-    userId: 'd4',
-    username: 'Sam L.',
-    exerciseId: 'pull-ups',
-    exerciseName: 'Pull-ups',
-    category: 'reps',
-    score: 25,
-    createdAt: Timestamp.fromDate(new Date('2026-09-04')),
-  },
-  {
-    id: 'lb-5',
-    userId: 'd5',
-    username: 'Chris B.',
-    exerciseId: 'pull-ups',
-    exerciseName: 'Pull-ups',
-    category: 'reps',
-    score: 22,
-    createdAt: Timestamp.fromDate(new Date('2026-09-05')),
-  },
-];
 
 const podiumIcons = [
   { icon: Crown, color: 'text-yellow-400', bg: 'bg-yellow-400/10 ring-yellow-400/30' },
@@ -91,7 +34,7 @@ function formatLeaderboardScore(record: PRRecord): string {
     case 'reps':
       return `${record.score} reps`;
     case 'static':
-      return `${record.score}s`;
+      return `${record.score} sec`;
     case 'weighted':
       return `+${record.addedWeightKg ?? record.score}kg`;
   }
@@ -161,9 +104,9 @@ export default function LeaderboardPage() {
       }
       const deduped = Array.from(byUser.values()).sort((a, b) => b.score - a.score);
 
-      setRecords(deduped.length > 0 ? deduped : (gender === 'all' ? DEMO_LEADERBOARD : []));
+      setRecords(deduped);
     } catch {
-      setRecords(gender === 'all' ? DEMO_LEADERBOARD : []);
+      setRecords([]);
     } finally {
       setLoading(false);
     }
@@ -174,9 +117,9 @@ export default function LeaderboardPage() {
   }, [activeTab, genderFilter, fetchLeaderboard]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-lg mx-auto overflow-x-hidden w-full">
+    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto overflow-x-hidden w-full">
       {/* Header */}
-      <header className="px-5 pt-8 pb-2">
+      <header className="px-5 pt-8 pb-2 md:px-8">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -185,7 +128,7 @@ export default function LeaderboardPage() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-black text-white">Leaderboards</h1>
+            <h1 className="text-xl font-black text-white md:text-2xl">Leaderboards</h1>
           </div>
           <button
             onClick={() => setFavModalOpen(true)}
@@ -197,7 +140,7 @@ export default function LeaderboardPage() {
       </header>
 
       {/* Gender toggle */}
-      <div className="flex gap-1.5 px-5 mt-3">
+      <div className="flex gap-1.5 px-5 mt-3 md:px-8">
         {(['all', 'male', 'female'] as const).map((g) => (
           <button
             key={g}
@@ -216,7 +159,7 @@ export default function LeaderboardPage() {
       {/* Horizontal scrollable filter tabs */}
       <div className="relative mt-3 mb-4 overflow-hidden">
         <div
-          className="flex gap-1.5 overflow-x-auto px-5 pb-2 scrollbar-hide"
+          className="flex gap-1.5 overflow-x-auto px-5 pb-2 scrollbar-hide md:px-8"
         >
           {sortedTabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -244,7 +187,7 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Rankings list */}
-      <section className="px-5">
+      <section className="px-5 md:px-8">
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
