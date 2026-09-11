@@ -207,16 +207,24 @@ export default function ProfilePage() {
         />
       </section>
 
-      {/* Personal Bests by Category */}
+      {/* Personal Bests — only exercises with PRs */}
       {fetching ? (
         <div className="flex justify-center py-12">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        </div>
+      ) : records.length === 0 ? (
+        <div className="flex flex-col items-center py-12 text-center px-5">
+          <p className="text-sm text-white/40">No PRs yet</p>
+          <p className="mt-1 text-xs text-white/25">Tap + to log your first record</p>
         </div>
       ) : (
         <section className="space-y-6 px-5 md:px-8">
           {categories.map((cat) => {
             const style = categoryStyle[cat];
-            const exercisesInCat = exercises.filter((e) => e.category === cat);
+            const exercisesWithPRs = exercises
+              .filter((e) => e.category === cat && prMap.has(e.id))
+              .sort((a, b) => (prMap.get(b.id)?.score ?? 0) - (prMap.get(a.id)?.score ?? 0));
+            if (exercisesWithPRs.length === 0) return null;
             return (
               <div key={cat}>
                 <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
@@ -225,21 +233,21 @@ export default function ProfilePage() {
                   </span>
                 </h3>
                 <div className={`rounded-2xl border ${style.border} bg-white/[0.02] divide-y divide-white/[0.06]`}>
-                  {exercisesInCat.map((ex) => {
-                    const pr = prMap.get(ex.id);
+                  {exercisesWithPRs.map((ex) => {
+                    const pr = prMap.get(ex.id)!;
                     return (
                       <div
                         key={ex.id}
                         className="flex items-center justify-between px-4 py-3"
                       >
-                        <span className={`text-sm ${pr ? 'text-white/90' : 'text-white/25'}`}>
+                        <span className="text-sm text-white/90">
                           {ex.name}
                         </span>
                         <div className="flex items-center gap-2">
-                          <span className={`text-sm font-bold ${pr ? style.accent : 'text-white/20'}`}>
-                            {pr ? formatScore(pr) : '—'}
+                          <span className={`text-sm font-bold ${style.accent}`}>
+                            {formatScore(pr)}
                           </span>
-                          {pr?.id && (
+                          {pr.id && (
                             <button
                               onClick={() => deletePR(pr.id!)}
                               disabled={deletingId === pr.id}

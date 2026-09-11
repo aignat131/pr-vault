@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   collection,
   query,
@@ -9,7 +9,7 @@ import {
   limit,
   getDocs,
 } from 'firebase/firestore';
-import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2, Search } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useExercises } from '@/context/ExercisesContext';
@@ -51,6 +51,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [favModalOpen, setFavModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
 
   // Load favorites from localStorage
   useEffect(() => {
@@ -65,11 +66,18 @@ export default function LeaderboardPage() {
   }, []);
 
   // Sort tabs: favorites first, then rest
-  const sortedTabs = [...allTabs].sort((a, b) => {
-    const aFav = favorites.has(a.id) ? 0 : 1;
-    const bFav = favorites.has(b.id) ? 0 : 1;
-    return aFav - bFav;
-  });
+  const sortedTabs = useMemo(() => {
+    let tabs = [...allTabs].sort((a, b) => {
+      const aFav = favorites.has(a.id) ? 0 : 1;
+      const bFav = favorites.has(b.id) ? 0 : 1;
+      return aFav - bFav;
+    });
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      tabs = tabs.filter((t) => t.label.toLowerCase().includes(q));
+    }
+    return tabs;
+  }, [allTabs, favorites, search]);
 
   const toggleFavorite = useCallback((exerciseId: string) => {
     setFavorites((prev) => {
@@ -118,8 +126,8 @@ export default function LeaderboardPage() {
 
   return (
     <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto overflow-x-hidden w-full">
-      {/* Header */}
-      <header className="px-5 pt-8 pb-2 md:px-8">
+      {/* Header — matches Home page pt-12 */}
+      <header className="px-5 pt-12 pb-2 md:px-8">
         <div className="flex items-center gap-3">
           <Link
             href="/"
@@ -128,7 +136,10 @@ export default function LeaderboardPage() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl font-black text-white md:text-2xl">Leaderboards</h1>
+            <p className="text-xs font-medium uppercase tracking-widest text-white/40">
+              Ranks
+            </p>
+            <h1 className="mt-1 text-2xl font-black text-white md:text-3xl">Leaderboards</h1>
           </div>
           <button
             onClick={() => setFavModalOpen(true)}
@@ -139,9 +150,9 @@ export default function LeaderboardPage() {
         </div>
       </header>
 
-      {/* Gender toggle */}
+      {/* Gender toggle: All + Women only */}
       <div className="flex gap-1.5 px-5 mt-3 md:px-8">
-        {(['all', 'male', 'female'] as const).map((g) => (
+        {(['all', 'female'] as const).map((g) => (
           <button
             key={g}
             onClick={() => setGenderFilter(g)}
@@ -151,9 +162,23 @@ export default function LeaderboardPage() {
                 : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
             }`}
           >
-            {g === 'all' ? 'All' : g === 'male' ? 'Men' : 'Women'}
+            {g === 'all' ? 'All' : 'Women'}
           </button>
         ))}
+      </div>
+
+      {/* Search bar */}
+      <div className="px-5 mt-3 md:px-8">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+          <input
+            type="text"
+            placeholder="Search exercises..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-9 pr-4 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
+          />
+        </div>
       </div>
 
       {/* Horizontal scrollable filter tabs */}
@@ -284,7 +309,11 @@ export default function LeaderboardPage() {
       </section>
 
       <BottomNav onAddPress={() => setModalOpen(true)} />
-      <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} />
+      <AddPRModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        defaultExerciseId={activeTab}
+      />
       <FavoritesModal
         open={favModalOpen}
         onClose={() => setFavModalOpen(false)}

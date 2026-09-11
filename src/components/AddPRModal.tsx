@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { X, Loader2, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { X, Loader2, Search } from 'lucide-react';
 import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
 import { STORAGE_KEYS } from '@/lib/constants';
+import { categoryStyle } from '@/lib/utils';
 import confetti from 'canvas-confetti';
 import type { Exercise } from '@/types';
 
@@ -15,17 +16,19 @@ interface AddPRModalProps {
   onClose: () => void;
   onSave?: () => void;
   gender?: string | null;
+  defaultExerciseId?: string;
 }
 
-export default function AddPRModal({ open, onClose, onSave, gender: genderProp }: AddPRModalProps) {
+export default function AddPRModal({ open, onClose, onSave, gender: genderProp, defaultExerciseId }: AddPRModalProps) {
   const { user } = useAuth();
   const exercises = useExercises();
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(exercises[0] ?? null);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [score, setScore] = useState('');
   const [addedWeight, setAddedWeight] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   // Reset form when modal opens
   useEffect(() => {
@@ -34,9 +37,20 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
       setAddedWeight('');
       setVideoUrl('');
       setError('');
-      setSelectedExercise(exercises[0] ?? null);
+      setSearch('');
+      // Use defaultExerciseId if provided, otherwise first exercise
+      const defaultEx = defaultExerciseId
+        ? exercises.find((e) => e.id === defaultExerciseId)
+        : null;
+      setSelectedExercise(defaultEx ?? exercises[0] ?? null);
     }
-  }, [open, exercises]);
+  }, [open, exercises, defaultExerciseId]);
+
+  const filteredExercises = useMemo(() => {
+    if (!search.trim()) return exercises;
+    const q = search.toLowerCase();
+    return exercises.filter((e) => e.name.toLowerCase().includes(q));
+  }, [exercises, search]);
 
   const handleSubmit = useCallback(async () => {
     if (!user) {
@@ -66,27 +80,6 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
         where('exerciseId', '==', selectedExercise.id),
       );
       const existingSnap = await getDocs(existingQuery);
-
-      // 1 new exercise per day limit: if this is a NEW exercise (no existing record),
-      // check if user already created a PR for a different exercise today
-      if (existingSnap.empty) {
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const todayQuery = query(
-          collection(getClientDb(), 'records'),
-          where('userId', '==', user.uid),
-          where('createdAt', '>=', Timestamp.fromDate(startOfToday)),
-        );
-        const todaySnap = await getDocs(todayQuery);
-        const newPRsToday = todaySnap.docs.filter(
-          (d) => d.data().exerciseId !== selectedExercise.id,
-        );
-        if (newPRsToday.length > 0) {
-          setError('You already set a new PR today. Come back tomorrow!');
-          setLoading(false);
-          return;
-        }
-      }
 
       if (!existingSnap.empty) {
         const existingDoc = existingSnap.docs[0];
@@ -166,6 +159,8 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
         ? 'Seconds'
         : 'Total weight (kg)';
 
+  const style = categoryStyle[selectedExercise.category];
+
   return (
     <>
       {/* Backdrop */}
@@ -176,7 +171,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
 
       {/* Bottom sheet */}
       <div className="fixed inset-x-0 bottom-0 z-50 animate-slide-up max-w-2xl mx-auto">
-        <div className="rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl">
+        <div className="max-h-[85dvh] overflow-y-auto rounded-t-3xl border-t border-white/[0.08] bg-zinc-900/95 px-6 pb-10 pt-4 shadow-2xl backdrop-blur-2xl">
           {/* Drag handle */}
           <div className="mx-auto mb-6 h-1 w-10 rounded-full bg-white/20" />
 
@@ -191,29 +186,54 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp }
             </button>
           </div>
 
-          {/* Exercise selector */}
+          {/* Exercise selector with search */}
           <label className="mb-4 block">
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/50">
               Exercise
             </span>
-            <div className="relative">
-              <select
-                value={selectedExercise.id}
-                onChange={(e) => {
-                  const ex = exercises.find((x) => x.id === e.target.value);
-                  if (ex) setSelectedExercise(ex);
-                }}
-                className="w-full appearance-none rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 pr-10 text-sm text-white outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
-              >
-                {exercises.map((ex) => (
-                  <option key={ex.id} value={ex.id} className="bg-zinc-900 text-white">
-                    {ex.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                type="text"
+                placeholder="Search exercises..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] py-2.5 pl-9 pr-4 text-sm text-white placeholder-white/30 outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30"
+              />
+            </div>
+            <div className="max-h-36 overflow-y-auto rounded-xl border border-white/[0.08] bg-white/[0.02] scrollbar-hide">
+              {filteredExercises.map((ex) => {
+                const active = selectedExercise.id === ex.id;
+                const exStyle = categoryStyle[ex.category];
+                return (
+                  <button
+                    key={ex.id}
+                    onClick={() => { setSelectedExercise(ex); setSearch(''); }}
+                    className={`flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors ${
+                      active
+                        ? 'bg-emerald-500/10 text-white'
+                        : 'text-white/70 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <span>{ex.name}</span>
+                    <span className={`text-[10px] font-medium uppercase ${exStyle.accent}`}>
+                      {exStyle.label}
+                    </span>
+                  </button>
+                );
+              })}
+              {filteredExercises.length === 0 && (
+                <p className="px-4 py-3 text-sm text-white/30">No exercises found</p>
+              )}
             </div>
           </label>
+
+          {/* Selected exercise indicator */}
+          <div className={`mb-4 flex items-center gap-2 rounded-xl border ${style.border} bg-white/[0.02] px-4 py-2.5`}>
+            <div className={`h-2 w-2 rounded-full ${style.dot}`} />
+            <span className="text-sm font-medium text-white">{selectedExercise.name}</span>
+            <span className={`ml-auto text-[10px] font-semibold uppercase ${style.accent}`}>{style.label}</span>
+          </div>
 
           {/* Score input */}
           <label className="mb-4 block">

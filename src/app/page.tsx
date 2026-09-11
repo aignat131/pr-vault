@@ -1,26 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { Flame, Zap, TrendingUp, Timer } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Timer, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { useExercises } from '@/context/ExercisesContext';
 import PRCard from '@/components/PRCard';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
 import OnboardingModal from '@/components/OnboardingModal';
 import type { PRRecord } from '@/types';
 import { STORAGE_KEYS } from '@/lib/constants';
+import { categoryStyle, formatScoreUpper } from '@/lib/utils';
+
+const DEFAULT_SHOWCASE = ['pull-ups', 'front-lever', 'weighted-pull-ups'];
 
 export default function HomePage() {
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
+  const exercises = useExercises();
   const [records, setRecords] = useState<PRRecord[]>([]);
-  const [totalPRs, setTotalPRs] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showcase, setShowcase] = useState<string[]>(DEFAULT_SHOWCASE);
+  const [editingSlot, setEditingSlot] = useState<number | null>(null);
+
+  // Load showcase config
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SHOWCASE);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length === 3) setShowcase(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Check if onboarding is needed after login
   useEffect(() => {
@@ -38,7 +57,6 @@ export default function HomePage() {
   useEffect(() => {
     if (!user) {
       setRecords([]);
-      setTotalPRs(0);
       return;
     }
 
@@ -61,8 +79,7 @@ export default function HomePage() {
           seen.add(r.exerciseId);
           return true;
         });
-        setRecords(deduped.slice(0, 5));
-        setTotalPRs(deduped.length);
+        setRecords(deduped);
       } catch (err) {
         console.error('[HomePage] Firestore query failed:', err);
       } finally {
@@ -74,9 +91,23 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, [user, refreshKey]);
 
+  const updateShowcaseSlot = useCallback((slotIndex: number, exerciseId: string) => {
+    setShowcase((prev) => {
+      const next = [...prev];
+      next[slotIndex] = exerciseId;
+      localStorage.setItem(STORAGE_KEYS.SHOWCASE, JSON.stringify(next));
+      return next;
+    });
+    setEditingSlot(null);
+  }, []);
+
+  const prMap = new Map(records.map((r) => [r.exerciseId, r]));
+
   const greeting = user
     ? `Hey, ${user.displayName?.split(' ')[0] ?? 'Athlete'}`
     : 'Welcome to PR Vault';
+
+  const displayRecords = records.slice(0, 5);
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#09090b] pb-28 w-full max-w-2xl mx-auto">
@@ -108,27 +139,67 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Authenticated: Stats + PRs */}
+      {/* Authenticated: Showcase + PRs */}
       {user && (
         <>
-          {/* Quick Stats */}
+          {/* Customizable PR Showcase */}
           <section className="mb-6 grid grid-cols-3 gap-3 px-5 md:px-8 md:gap-4">
-            <StatCard
-              icon={<Flame className="h-4 w-4 text-emerald-400" />}
-              value={totalPRs}
-              label="Total PRs"
-            />
-            <StatCard
-              icon={<Zap className="h-4 w-4 text-cyan-400" />}
-              value={records.filter((r) => r.category === 'reps').length}
-              label="Rep PRs"
-            />
-            <StatCard
-              icon={<TrendingUp className="h-4 w-4 text-amber-400" />}
-              value={records.filter((r) => r.category === 'weighted').length}
-              label="Weighted"
-            />
+            {showcase.map((exerciseId, i) => {
+              const exercise = exercises.find((e) => e.id === exerciseId);
+              const pr = prMap.get(exerciseId);
+              const style = exercise ? categoryStyle[exercise.category] : categoryStyle.reps;
+              const isEditing = editingSlot === i;
+
+              return (
+                <div key={`slot-${i}`} className="relative">
+                  <button
+                    onClick={() => setEditingSlot(isEditing ? null : i)}
+                    className={`w-full rounded-2xl border ${style.border} bg-white/[0.03] p-3 backdrop-blur-xl transition-all md:p-4 text-left ${
+                      isEditing ? 'ring-1 ring-emerald-500/50' : ''
+                    }`}
+                  >
+                    <p className="mb-1 truncate text-[10px] font-medium uppercase tracking-wider text-white/40 md:text-[11px]">
+                      {exercise?.name ?? 'Choose'}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <span className={`text-lg font-black md:text-xl ${pr ? style.accent : 'text-white/20'}`}>
+                        {pr ? formatScoreUpper(pr) : '—'}
+                      </span>
+                    </div>
+                    <ChevronDown className="absolute top-2 right-2 h-3 w-3 text-white/20" />
+                  </button>
+
+                  {/* Inline exercise picker */}
+                  {isEditing && (
+                    <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-white/[0.1] bg-zinc-900/98 shadow-2xl backdrop-blur-2xl scrollbar-hide">
+                      {exercises.map((ex) => {
+                        const exStyle = categoryStyle[ex.category];
+                        return (
+                          <button
+                            key={ex.id}
+                            onClick={() => updateShowcaseSlot(i, ex.id)}
+                            className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors hover:bg-white/[0.06] ${
+                              exerciseId === ex.id ? 'bg-emerald-500/10 text-white' : 'text-white/70'
+                            }`}
+                          >
+                            <span className="truncate">{ex.name}</span>
+                            <span className={`shrink-0 text-[9px] font-semibold uppercase ${exStyle.accent}`}>
+                              {exStyle.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </section>
+
+          {/* Close picker on outside click */}
+          {editingSlot !== null && (
+            <div className="fixed inset-0 z-20" onClick={() => setEditingSlot(null)} />
+          )}
 
           {/* PR Feed */}
           <section className="flex-1 px-5 md:px-8">
@@ -140,9 +211,9 @@ export default function HomePage() {
               <div className="flex justify-center py-12">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
               </div>
-            ) : records.length > 0 ? (
+            ) : displayRecords.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 md:gap-4">
-                {records.map((record) => (
+                {displayRecords.map((record) => (
                   <PRCard key={record.id} record={record} />
                 ))}
               </div>
@@ -212,28 +283,6 @@ export default function HomePage() {
         open={showOnboarding}
         onComplete={() => setShowOnboarding(false)}
       />
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: number;
-  label: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-3 backdrop-blur-xl md:p-4">
-      <div className="mb-2 flex items-center gap-1.5">
-        {icon}
-        <span className="text-xl font-black text-white md:text-2xl">{value}</span>
-      </div>
-      <p className="text-[10px] font-medium uppercase tracking-wider text-white/40 md:text-[11px]">
-        {label}
-      </p>
     </div>
   );
 }
