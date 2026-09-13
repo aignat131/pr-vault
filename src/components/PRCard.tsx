@@ -1,8 +1,8 @@
 'use client';
 
-import { ExternalLink, Share2 } from 'lucide-react';
-import type { PRRecord } from '@/types';
-import { categoryStyle, formatScoreUpper as formatScoreDisplay, formatScore, formatDate } from '@/lib/utils';
+import { ExternalLink, Share2, ShieldCheck } from 'lucide-react';
+import type { PRRecord, WeightUnit } from '@/types';
+import { categoryStyle, formatScoreUpper as formatScoreDisplay, formatScore, formatDate, useWeightUnit } from '@/lib/utils';
 
 interface PRCardProps {
   record: PRRecord;
@@ -10,6 +10,7 @@ interface PRCardProps {
 
 export default function PRCard({ record }: PRCardProps) {
   const style = categoryStyle[record.category];
+  const weightUnit = useWeightUnit();
 
   return (
     <div
@@ -60,16 +61,24 @@ export default function PRCard({ record }: PRCardProps) {
 
       {/* Score */}
       <p className={`text-3xl font-black tracking-tight ${style.accent}`}>
-        {formatScoreDisplay(record)}
+        {formatScoreDisplay(record, weightUnit)}
       </p>
 
       {/* Category badge + actions */}
       <div className="mt-3 flex items-center justify-between">
-        <span
-          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style.badge}`}
-        >
-          {record.category}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${style.badge}`}
+          >
+            {record.category}
+          </span>
+          {record.validated && (
+            <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+              <ShieldCheck className="h-3 w-3" />
+              Verified
+            </span>
+          )}
+        </div>
 
         <div className="flex items-center gap-1.5">
           {record.videoUrl && (

@@ -1,25 +1,50 @@
-import type { PRRecord, ExerciseCategory } from '@/types';
+import { useState, useEffect } from 'react';
+import type { PRRecord, ExerciseCategory, WeightUnit } from '@/types';
+import { STORAGE_KEYS } from '@/lib/constants';
 
-export function formatScore(record: PRRecord): string {
+function kgToLbs(kg: number): number {
+  return Math.round(kg * 2.20462);
+}
+
+export function formatScore(record: PRRecord, weightUnit: WeightUnit = 'kg'): string {
   switch (record.category) {
     case 'reps':
       return `${record.score} reps`;
     case 'static':
       return `${record.score} sec`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
+    case 'weighted': {
+      const val = record.addedWeightKg ?? record.score;
+      return weightUnit === 'lbs' ? `+${kgToLbs(val)}lbs` : `+${val}kg`;
+    }
   }
 }
 
-export function formatScoreUpper(record: PRRecord): string {
+export function formatScoreUpper(record: PRRecord, weightUnit: WeightUnit = 'kg'): string {
   switch (record.category) {
     case 'reps':
       return `${record.score} REPS`;
     case 'static':
       return `${record.score} SEC`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
+    case 'weighted': {
+      const val = record.addedWeightKg ?? record.score;
+      return weightUnit === 'lbs' ? `+${kgToLbs(val)}lbs` : `+${val}kg`;
+    }
   }
+}
+
+export function useWeightUnit(): WeightUnit {
+  const [unit, setUnit] = useState<WeightUnit>('kg');
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEYS.WEIGHT_UNIT);
+    if (stored === 'lbs') setUnit('lbs');
+    const handler = () => {
+      const v = localStorage.getItem(STORAGE_KEYS.WEIGHT_UNIT);
+      setUnit(v === 'lbs' ? 'lbs' : 'kg');
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
+  }, []);
+  return unit;
 }
 
 export function formatDate(timestamp: { seconds: number }): string {

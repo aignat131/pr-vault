@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import { RolesProvider } from "@/context/RolesContext";
 import { ExercisesProvider } from "@/context/ExercisesContext";
 import "./globals.css";
 
@@ -45,7 +46,9 @@ export default function RootLayout({
     >
       <body className="min-h-dvh flex flex-col bg-[#09090b] text-white overflow-x-hidden">
         <AuthProvider>
-          <ExercisesProvider>{children}</ExercisesProvider>
+          <RolesProvider>
+            <ExercisesProvider>{children}</ExercisesProvider>
+          </RolesProvider>
         </AuthProvider>
       </body>
     </html>

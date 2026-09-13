@@ -1,18 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check } from 'lucide-react';
+import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check, MessageSquare, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
 import { type ExerciseCategory, type Gender } from '@/types';
-import type { PRRecord } from '@/types';
+import type { PRRecord, ValidationRequest } from '@/types';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
-import { categoryStyle, formatScore } from '@/lib/utils';
-import { ADMIN_EMAIL, STORAGE_KEYS } from '@/lib/constants';
+import FeedbackModal from '@/components/FeedbackModal';
+import SettingsModal from '@/components/SettingsModal';
+import ProgressGraphs from '@/components/ProgressGraphs';
+import ValidationRequestButton from '@/components/ValidationRequestButton';
+import { categoryStyle, formatScore, useWeightUnit } from '@/lib/utils';
+import { STORAGE_KEYS } from '@/lib/constants';
+import { useRoles } from '@/context/RolesContext';
 
 function formatMemberSince(dateStr: string | undefined): string {
   if (!dateStr) return '—';
@@ -22,7 +27,9 @@ function formatMemberSince(dateStr: string | undefined): string {
 
 export default function ProfilePage() {
   const { user, loading, loginWithGoogle, logout } = useAuth();
+  const { hasAnyRole, userRole } = useRoles();
   const exercises = useExercises();
+  const weightUnit = useWeightUnit();
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [fetching, setFetching] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,6 +37,10 @@ export default function ProfilePage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [validations, setValidations] = useState<Map<string, ValidationRequest>>(new Map());
+  const [pendingValidationCount, setPendingValidationCount] = useState(0);
 
   const handleInvite = async () => {
     const url = window.location.origin;
@@ -107,6 +118,29 @@ export default function ProfilePage() {
     return () => { cancelled = true; };
   }, [user, refreshKey]);
 
+  const fetchValidations = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(collection(getClientDb(), 'validations'), where('userId', '==', user.uid));
+      const snap = await getDocs(q);
+      const map = new Map<string, ValidationRequest>();
+      let pending = 0;
+      snap.docs.forEach((d) => {
+        const v = { id: d.id, ...d.data() } as ValidationRequest;
+        map.set(v.exerciseId, v);
+        if (v.status === 'pending') pending++;
+      });
+      setValidations(map);
+      setPendingValidationCount(pending);
+    } catch (err) {
+      console.error('[Profile] Failed to fetch validations:', err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchValidations();
+  }, [fetchValidations, refreshKey]);
+
   if (loading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-2xl mx-auto">
@@ -159,6 +193,13 @@ export default function ProfilePage() {
         </h1>
         <p className="mt-1 text-sm text-white/40">{user.email}</p>
 
+        {/* Role badge */}
+        {userRole && (
+          <span className="mt-2 rounded-full bg-emerald-500/10 px-3 py-0.5 text-[10px] font-semibold text-emerald-400 uppercase tracking-wider">
+            {userRole.replace('_', ' ')}
+          </span>
+        )}
+
         {/* Gender selector */}
         <div className="mt-4 flex items-center gap-2">
           {(['male', 'female'] as const).map((g) => (
@@ -176,16 +217,25 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        {/* Admin link */}
-        {user.email === ADMIN_EMAIL && (
-          <Link
-            href="/admin"
-            className="mt-4 flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
+        {/* Admin link + Settings */}
+        <div className="mt-4 flex items-center gap-2">
+          {hasAnyRole && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-2 rounded-full border border-emerald-500/20 px-5 py-2 text-sm font-medium text-emerald-400 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10"
+            >
+              <Shield className="h-4 w-4" />
+              Admin Hub
+            </Link>
+          )}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-2 rounded-full border border-white/[0.08] px-4 py-2 text-sm font-medium text-white/50 transition-colors hover:border-white/20 hover:bg-white/[0.06] hover:text-white/70"
           >
-            <Shield className="h-4 w-4" />
-            Admin Hub
-          </Link>
-        )}
+            <Settings className="h-4 w-4" />
+            Settings
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -206,6 +256,9 @@ export default function ProfilePage() {
           label="Categories"
         />
       </section>
+
+      {/* Progress Graphs */}
+      {records.length > 0 && <ProgressGraphs records={records} />}
 
       {/* Personal Bests — only exercises with PRs */}
       {fetching ? (
@@ -245,8 +298,14 @@ export default function ProfilePage() {
                         </span>
                         <div className="flex items-center gap-2">
                           <span className={`text-sm font-bold ${style.accent}`}>
-                            {formatScore(pr)}
+                            {formatScore(pr, weightUnit)}
                           </span>
+                          <ValidationRequestButton
+                            record={pr}
+                            validation={validations.get(pr.exerciseId) ?? null}
+                            pendingCount={pendingValidationCount}
+                            onRequested={fetchValidations}
+                          />
                           {pr.id && (
                             <button
                               onClick={() => deletePR(pr.id!)}
@@ -300,6 +359,26 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Send Feedback */}
+      <div className="mx-5 mt-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 md:mx-8">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/10">
+            <MessageSquare className="h-5 w-5 text-violet-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-white">Send Feedback</p>
+            <p className="text-xs text-white/40">Report bugs or suggest features</p>
+          </div>
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            className="flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold bg-white/[0.08] text-white/70 hover:bg-white/[0.12] hover:text-white transition-all duration-200"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Write
+          </button>
+        </div>
+      </div>
+
       {/* Sign out */}
       <div className="flex justify-center px-5 pt-8 pb-4">
         <button
@@ -313,6 +392,8 @@ export default function ProfilePage() {
 
       <BottomNav onAddPress={() => setModalOpen(true)} />
       <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={() => setRefreshKey((k) => k + 1)} gender={gender} />
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSettingsChanged={() => setRefreshKey((k) => k + 1)} />
     </div>
   );
 }

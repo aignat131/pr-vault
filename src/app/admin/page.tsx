@@ -27,15 +27,21 @@ import {
   Dumbbell,
   Video,
   Loader2,
+  Users,
+  MessageSquare,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { useRoles } from '@/context/RolesContext';
 import { useExercisesContext } from '@/context/ExercisesContext';
 import { EXERCISES as DEFAULT_EXERCISES, type ExerciseCategory } from '@/types';
 import type { PRRecord } from '@/types';
 import { formatScore, formatDateFull as formatDate, categoryStyle } from '@/lib/utils';
-import { ADMIN_EMAIL } from '@/lib/constants';
+import TeamTab from '@/components/admin/TeamTab';
+import FeedbackTab from '@/components/admin/FeedbackTab';
+import ValidationTab from '@/components/admin/ValidationTab';
 
 const categoryOptions: { value: ExerciseCategory; label: string; unit: string }[] = [
   { value: 'reps', label: 'Reps', unit: 'reps' },
@@ -43,10 +49,20 @@ const categoryOptions: { value: ExerciseCategory; label: string; unit: string }[
   { value: 'weighted', label: 'Weighted', unit: 'kg' },
 ];
 
-type Tab = 'exercises' | 'review';
+type Tab = 'exercises' | 'review' | 'team' | 'feedback' | 'validations';
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
+  const {
+    roleLoading,
+    hasAnyRole,
+    isOwner,
+    canManageExercises,
+    canReviewForms,
+    canReviewValidations,
+    canViewFeedback,
+    canManageTeam,
+  } = useRoles();
   const { exercises, refreshExercises } = useExercisesContext();
   const [activeTab, setActiveTab] = useState<Tab>('exercises');
 
@@ -61,6 +77,24 @@ export default function AdminPage() {
   const [reviewLoading, setReviewLoading] = useState(false);
 
   const defaultIds = new Set(DEFAULT_EXERCISES.map((e) => e.id));
+
+  // Build visible tabs based on permissions
+  const tabs: { id: Tab; label: string; icon: typeof Dumbbell; visible: boolean }[] = [
+    { id: 'exercises', label: 'Exercises', icon: Dumbbell, visible: canManageExercises },
+    { id: 'review', label: 'Form Review', icon: Video, visible: canReviewForms },
+    { id: 'validations', label: 'Validations', icon: ShieldCheck, visible: canReviewValidations },
+    { id: 'feedback', label: 'Feedback', icon: MessageSquare, visible: canViewFeedback },
+    { id: 'team', label: 'Team', icon: Users, visible: canManageTeam },
+  ];
+
+  const visibleTabs = tabs.filter((t) => t.visible);
+
+  // Set initial active tab to the first visible one
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    }
+  }, [visibleTabs, activeTab]);
 
   // Load video records for form review
   const fetchVideoRecords = useCallback(async () => {
@@ -82,10 +116,10 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (user?.email === ADMIN_EMAIL && activeTab === 'review') {
+    if (hasAnyRole && activeTab === 'review') {
       fetchVideoRecords();
     }
-  }, [user, activeTab, fetchVideoRecords]);
+  }, [hasAnyRole, activeTab, fetchVideoRecords]);
 
   const handleAddExercise = async () => {
     const name = newName.trim();
@@ -121,14 +155,12 @@ export default function AdminPage() {
   const handleDeleteExercise = async (exerciseId: string) => {
     try {
       if (defaultIds.has(exerciseId)) {
-        // Hide default exercise by adding to config/exercises.hiddenIds
         await setDoc(
           doc(getClientDb(), 'config', 'exercises'),
           { hiddenIds: arrayUnion(exerciseId) },
           { merge: true },
         );
       } else {
-        // Delete custom exercise from Firestore using stored doc ID
         const exercise = exercises.find((e) => e.id === exerciseId);
         const docId = exercise?.firestoreDocId ?? exerciseId;
         await deleteDoc(doc(getClientDb(), 'exercises', docId));
@@ -153,7 +185,7 @@ export default function AdminPage() {
   };
 
   // Auth gate
-  if (authLoading) {
+  if (authLoading || roleLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-2xl mx-auto">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
@@ -161,7 +193,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) {
+  if (!user || !hasAnyRole) {
     return (
       <div className="flex min-h-dvh flex-col items-center justify-center bg-[#09090b] px-6 max-w-2xl mx-auto">
         <h1 className="mb-2 text-xl font-black text-white">Access Denied</h1>
@@ -196,15 +228,12 @@ export default function AdminPage() {
       </header>
 
       {/* Tab switcher */}
-      <div className="flex gap-1.5 px-5 mt-3 mb-5">
-        {([
-          { id: 'exercises' as Tab, label: 'Exercises', icon: Dumbbell },
-          { id: 'review' as Tab, label: 'Form Review', icon: Video },
-        ]).map((tab) => (
+      <div className="flex gap-1.5 px-5 mt-3 mb-5 overflow-x-auto scrollbar-hide">
+        {visibleTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
+            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all duration-200 ${
               activeTab === tab.id
                 ? 'bg-white text-black'
                 : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
@@ -217,7 +246,7 @@ export default function AdminPage() {
       </div>
 
       {/* Exercises Tab */}
-      {activeTab === 'exercises' && (
+      {activeTab === 'exercises' && canManageExercises && (
         <section className="px-5 space-y-5">
           {/* Add exercise form */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
@@ -265,23 +294,20 @@ export default function AdminPage() {
                   {cat}
                 </span>
                 <div className="mt-2 divide-y divide-white/[0.06] rounded-2xl border border-white/[0.08] bg-white/[0.02]">
-                  {catExercises.map((ex) => {
-                    const isDefault = defaultIds.has(ex.id);
-                    return (
-                      <div
-                        key={ex.id}
-                        className="flex items-center justify-between px-4 py-3"
+                  {catExercises.map((ex) => (
+                    <div
+                      key={ex.id}
+                      className="flex items-center justify-between px-4 py-3"
+                    >
+                      <span className="text-sm text-white/90">{ex.name}</span>
+                      <button
+                        onClick={() => handleDeleteExercise(ex.id)}
+                        className="rounded-full p-1.5 text-white/20 transition-colors hover:bg-red-500/10 hover:text-red-400"
                       >
-                        <span className="text-sm text-white/90">{ex.name}</span>
-                        <button
-                          onClick={() => handleDeleteExercise(ex.id)}
-                          className="rounded-full p-1.5 text-white/20 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
@@ -290,7 +316,7 @@ export default function AdminPage() {
       )}
 
       {/* Form Review Tab */}
-      {activeTab === 'review' && (
+      {activeTab === 'review' && canReviewForms && (
         <section className="px-5">
           {reviewLoading ? (
             <div className="flex justify-center py-12">
@@ -314,7 +340,6 @@ export default function AdminPage() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    {/* Avatar */}
                     {record.userAvatar ? (
                       <img
                         src={record.userAvatar}
@@ -350,7 +375,6 @@ export default function AdminPage() {
                       </p>
                     </div>
 
-                    {/* Video link */}
                     <a
                       href={record.videoUrl!}
                       target="_blank"
@@ -361,7 +385,6 @@ export default function AdminPage() {
                     </a>
                   </div>
 
-                  {/* Verify / Reject buttons */}
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => handleVerify(record.id!, true)}
@@ -392,6 +415,15 @@ export default function AdminPage() {
           )}
         </section>
       )}
+
+      {/* Team Tab */}
+      {activeTab === 'team' && canManageTeam && <TeamTab />}
+
+      {/* Feedback Tab */}
+      {activeTab === 'feedback' && canViewFeedback && <FeedbackTab />}
+
+      {/* Validations Tab */}
+      {activeTab === 'validations' && canReviewValidations && <ValidationTab />}
     </div>
   );
 }

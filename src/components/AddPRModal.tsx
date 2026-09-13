@@ -7,7 +7,7 @@ import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
 import { STORAGE_KEYS } from '@/lib/constants';
-import { categoryStyle } from '@/lib/utils';
+import { categoryStyle, useWeightUnit } from '@/lib/utils';
 import confetti from 'canvas-confetti';
 import type { Exercise } from '@/types';
 
@@ -22,6 +22,7 @@ interface AddPRModalProps {
 export default function AddPRModal({ open, onClose, onSave, gender: genderProp, defaultExerciseId }: AddPRModalProps) {
   const { user } = useAuth();
   const exercises = useExercises();
+  const weightUnit = useWeightUnit();
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [score, setScore] = useState('');
   const [addedWeight, setAddedWeight] = useState('');
@@ -93,7 +94,19 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
 
         const userGender = genderProp ?? localStorage.getItem(STORAGE_KEYS.GENDER) ?? null;
 
+        // Save old score to pr_history before overwriting
+        const existingData = existingDoc.data();
+        await addDoc(collection(getClientDb(), 'pr_history'), {
+          userId: user.uid,
+          exerciseId: selectedExercise.id,
+          score: existingScore,
+          addedWeightKg: existingData.addedWeightKg ?? null,
+          category: selectedExercise.category,
+          createdAt: existingData.createdAt,
+        });
+
         // Update existing record
+        const now = Timestamp.now();
         await updateDoc(doc(getClientDb(), 'records', existingDoc.id), {
           score: numScore,
           addedWeightKg:
@@ -102,10 +115,24 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
               : null,
           videoUrl: videoUrl.trim() || null,
           gender: userGender,
-          createdAt: Timestamp.now(),
+          createdAt: now,
+        });
+
+        // Save new score to pr_history
+        await addDoc(collection(getClientDb(), 'pr_history'), {
+          userId: user.uid,
+          exerciseId: selectedExercise.id,
+          score: numScore,
+          addedWeightKg:
+            selectedExercise.category === 'weighted' && addedWeight
+              ? Number(addedWeight)
+              : null,
+          category: selectedExercise.category,
+          createdAt: now,
         });
       } else {
         const userGender = genderProp ?? localStorage.getItem(STORAGE_KEYS.GENDER) ?? null;
+        const now = Timestamp.now();
 
         // Create new record
         await addDoc(collection(getClientDb(), 'records'), {
@@ -123,7 +150,20 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
           videoUrl: videoUrl.trim() || null,
           gender: userGender,
           isNewPR: true,
-          createdAt: Timestamp.now(),
+          createdAt: now,
+        });
+
+        // Save to pr_history
+        await addDoc(collection(getClientDb(), 'pr_history'), {
+          userId: user.uid,
+          exerciseId: selectedExercise.id,
+          score: numScore,
+          addedWeightKg:
+            selectedExercise.category === 'weighted' && addedWeight
+              ? Number(addedWeight)
+              : null,
+          category: selectedExercise.category,
+          createdAt: now,
         });
       }
 
@@ -157,7 +197,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
       ? 'Reps'
       : selectedExercise.category === 'static'
         ? 'Seconds'
-        : 'Total weight (kg)';
+        : `Total weight (${weightUnit})`;
 
   const style = categoryStyle[selectedExercise.category];
 
@@ -262,7 +302,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
           {selectedExercise.category === 'weighted' && (
             <label className="mb-4 block">
               <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-white/50">
-                Added Weight (+kg)
+                Added Weight (+{weightUnit})
               </span>
               <input
                 type="number"

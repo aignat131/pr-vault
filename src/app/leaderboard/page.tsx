@@ -8,16 +8,19 @@ import {
   orderBy,
   limit,
   getDocs,
+  doc,
+  getDoc,
 } from 'firebase/firestore';
-import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2, Search } from 'lucide-react';
+import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2, Search, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useExercises } from '@/context/ExercisesContext';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
 import FavoritesModal from '@/components/FavoritesModal';
-import type { PRRecord, Gender } from '@/types';
+import type { PRRecord, Gender, WeightUnit } from '@/types';
 import { STORAGE_KEYS } from '@/lib/constants';
+import { useWeightUnit } from '@/lib/utils';
 
 const DEFAULT_FAVORITES = ['pull-ups', 'muscle-ups', 'dips', 'handstand-hold', 'front-lever', 'weighted-pull-ups'];
 
@@ -29,19 +32,22 @@ const podiumIcons = [
 
 type GenderFilter = 'all' | Gender;
 
-function formatLeaderboardScore(record: PRRecord): string {
+function formatLeaderboardScore(record: PRRecord, weightUnit: WeightUnit = 'kg'): string {
   switch (record.category) {
     case 'reps':
       return `${record.score} reps`;
     case 'static':
       return `${record.score} sec`;
-    case 'weighted':
-      return `+${record.addedWeightKg ?? record.score}kg`;
+    case 'weighted': {
+      const val = record.addedWeightKg ?? record.score;
+      return weightUnit === 'lbs' ? `+${Math.round(val * 2.20462)}lbs` : `+${val}kg`;
+    }
   }
 }
 
 export default function LeaderboardPage() {
   const exercises = useExercises();
+  const weightUnit = useWeightUnit();
   const allTabs = exercises.map((ex) => ({ id: ex.id, label: ex.name }));
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set(DEFAULT_FAVORITES));
@@ -110,7 +116,26 @@ export default function LeaderboardPage() {
           byUser.set(rec.userId, rec);
         }
       }
-      const deduped = Array.from(byUser.values()).sort((a, b) => b.score - a.score);
+
+      // Filter out users who have hideFromLeaderboard enabled
+      const userIds = Array.from(byUser.keys());
+      const hiddenUsers = new Set<string>();
+      await Promise.all(
+        userIds.map(async (uid) => {
+          try {
+            const userDoc = await getDoc(doc(getClientDb(), 'users', uid));
+            if (userDoc.exists() && userDoc.data().hideFromLeaderboard === true) {
+              hiddenUsers.add(uid);
+            }
+          } catch {
+            // ignore — user doc might not exist
+          }
+        }),
+      );
+
+      const deduped = Array.from(byUser.values())
+        .filter((r) => !hiddenUsers.has(r.userId))
+        .sort((a, b) => b.score - a.score);
 
       setRecords(deduped);
     } catch {
@@ -273,7 +298,10 @@ export default function LeaderboardPage() {
 
                   {/* Score */}
                   <div className="flex shrink-0 items-center gap-2">
-                    {record.formVerified === true && (
+                    {record.validated && (
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                    )}
+                    {record.formVerified === true && !record.validated && (
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                     )}
                     <span
@@ -287,7 +315,7 @@ export default function LeaderboardPage() {
                               : 'text-white/70'
                       }`}
                     >
-                      {formatLeaderboardScore(record)}
+                      {formatLeaderboardScore(record, weightUnit)}
                     </span>
 
                     {record.videoUrl && (

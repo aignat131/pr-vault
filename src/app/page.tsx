@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import { Flame, Zap, TrendingUp, Timer, ChevronDown } from 'lucide-react';
+import { Flame, Zap, TrendingUp, Timer, ChevronDown, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -13,13 +13,14 @@ import AddPRModal from '@/components/AddPRModal';
 import OnboardingModal from '@/components/OnboardingModal';
 import type { PRRecord } from '@/types';
 import { STORAGE_KEYS } from '@/lib/constants';
-import { categoryStyle, formatScoreUpper } from '@/lib/utils';
+import { categoryStyle, formatScoreUpper, useWeightUnit } from '@/lib/utils';
 
 const DEFAULT_SHOWCASE = ['pull-ups', 'front-lever', 'weighted-pull-ups'];
 
 export default function HomePage() {
   const { user, loading: authLoading, loginWithGoogle } = useAuth();
   const exercises = useExercises();
+  const weightUnit = useWeightUnit();
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -163,8 +164,11 @@ export default function HomePage() {
                     </p>
                     <div className="flex items-center gap-1">
                       <span className={`text-lg font-black md:text-xl ${pr ? style.accent : 'text-white/20'}`}>
-                        {pr ? formatScoreUpper(pr) : '—'}
+                        {pr ? formatScoreUpper(pr, weightUnit) : '—'}
                       </span>
+                      {pr?.validated && (
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      )}
                     </div>
                     <ChevronDown className="absolute top-2 right-2 h-3 w-3 text-white/20" />
                   </button>

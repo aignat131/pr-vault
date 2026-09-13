@@ -26,6 +26,7 @@ export interface PRRecord {
   videoUrl?: string;
   gender?: Gender;
   formVerified?: boolean;
+  validated?: boolean;
   isNewPR?: boolean;
   createdAt: Timestamp;
 }
@@ -35,6 +36,71 @@ export interface UserProfile {
   username: string;
   email: string;
   photoURL: string;
+}
+
+// Roles
+export type UserRole = 'owner' | 'moderator' | 'exercise_manager' | 'reviewer';
+
+export interface RoleAssignment {
+  uid: string;
+  email: string;
+  role: UserRole;
+  displayName: string;
+  photoURL: string | null;
+  grantedBy: string;
+  grantedAt: Timestamp;
+}
+
+// Feedback
+export type FeedbackType = 'bug' | 'feature' | 'general';
+export type FeedbackStatus = 'new' | 'read';
+
+export interface Feedback {
+  id?: string;
+  userId: string;
+  username: string;
+  userAvatar: string | null;
+  email: string;
+  type: FeedbackType;
+  message: string;
+  status: FeedbackStatus;
+  createdAt: Timestamp;
+}
+
+// PR History (for progress graphs)
+export interface PRHistoryEntry {
+  id?: string;
+  userId: string;
+  exerciseId: string;
+  score: number;
+  addedWeightKg: number | null;
+  category: ExerciseCategory;
+  createdAt: Timestamp;
+}
+
+// Settings
+export type WeightUnit = 'kg' | 'lbs';
+
+// Validation
+export type ValidationStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ValidationRequest {
+  id?: string;
+  userId: string;
+  username: string;
+  userAvatar: string | null;
+  exerciseId: string;
+  exerciseName: string;
+  category: ExerciseCategory;
+  recordId: string;
+  videoUrl: string;
+  score: number;
+  addedWeightKg: number | null;
+  status: ValidationStatus;
+  reviewedBy: string | null;
+  reviewedAt: Timestamp | null;
+  reviewNote: string | null;
+  createdAt: Timestamp;
 }
 
 // Predefined exercises for the app

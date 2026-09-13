@@ -1,33 +1,115 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // PR records: authenticated users can read all, write their own
+
+    // ── Helper functions ──
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnerEmail() {
+      return request.auth.token.email == 'aignat131@gmail.com';
+    }
+
+    function hasRoleDoc() {
+      return exists(/databases/$(database)/documents/roles/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role;
+    }
+
+    function isOwner() {
+      return isSignedIn() && (isOwnerEmail() || (hasRoleDoc() && getUserRole() == 'owner'));
+    }
+
+    function hasRole(role) {
+      return isOwner() || (isSignedIn() && hasRoleDoc() && getUserRole() == role);
+    }
+
+    function canManageExercises() {
+      return isOwner() || hasRole('moderator') || hasRole('exercise_manager');
+    }
+
+    function canReviewForms() {
+      return isOwner() || hasRole('moderator');
+    }
+
+    function canReviewValidations() {
+      return isOwner() || hasRole('moderator') || hasRole('reviewer');
+    }
+
+    // ── PR records ──
     match /records/{docId} {
       allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null
+      allow create: if isSignedIn();
+      allow update: if isSignedIn()
         && (request.auth.uid == resource.data.userId
-            || request.auth.token.email == 'aignat131@gmail.com');
+            || isOwner()
+            || canReviewForms()
+            || canReviewValidations());
+      allow delete: if isSignedIn()
+        && (request.auth.uid == resource.data.userId || isOwner());
     }
 
-    // User profiles: anyone can read, users can write their own
+    // ── User profiles ──
     match /users/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if isSignedIn() && request.auth.uid == uid;
     }
 
-    // Exercises: anyone can read, admin can write
+    // ── Exercises ──
     match /exercises/{docId} {
       allow read: if true;
-      allow write: if request.auth != null
-        && request.auth.token.email == 'aignat131@gmail.com';
+      allow write: if isSignedIn() && canManageExercises();
     }
 
-    // App config (hidden exercises etc): anyone can read, admin can write
+    // ── App config ──
     match /config/{docId} {
       allow read: if true;
-      allow write: if request.auth != null
-        && request.auth.token.email == 'aignat131@gmail.com';
+      allow write: if isSignedIn() && canManageExercises();
+    }
+
+    // ── Roles (only owner can manage) ──
+    match /roles/{uid} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == uid || isOwner());
+      allow write: if isSignedIn() && isOwner();
+    }
+
+    // ── Feedback ──
+    match /feedback/{docId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.userId || canReviewForms());
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && canReviewForms();
+      allow delete: if isSignedIn() && isOwner();
+    }
+
+    // ── PR History ──
+    match /pr_history/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
+    }
+
+    // ── Validations ──
+    match /validations/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isSignedIn()
+        && (canReviewValidations()
+            || (request.auth.uid == resource.data.userId
+                && resource.data.status == 'rejected'
+                && request.resource.data.status == 'pending'));
+      allow delete: if false;
     }
   }
 }
