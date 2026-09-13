@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Trophy, Plus, User } from 'lucide-react';
+import { Home, Clock, Trophy, Plus, User } from 'lucide-react';
 
 interface BottomNavProps {
   onAddPress: () => void;
@@ -10,10 +10,11 @@ interface BottomNavProps {
 
 const leftItems = [
   { href: '/', icon: Home, label: 'Home' },
-  { href: '/leaderboard', icon: Trophy, label: 'Ranks' },
+  { href: '/history', icon: Clock, label: 'Activity' },
 ] as const;
 
 const rightItems = [
+  { href: '/leaderboard', icon: Trophy, label: 'Ranks' },
   { href: '/profile', icon: User, label: 'Profile' },
 ] as const;
 
@@ -28,6 +29,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
       <Link
         key={href}
         href={href}
+        aria-label={label}
         className={`flex flex-col items-center gap-0.5 rounded-full px-3 py-2 transition-all duration-200 ${
           active
             ? 'bg-white/10 text-white'
@@ -48,6 +50,7 @@ export default function BottomNav({ onAddPress }: BottomNavProps) {
         {/* Center add button */}
         <button
           onClick={onAddPress}
+          aria-label="Add new PR"
           className="mx-1 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500 text-black shadow-lg shadow-emerald-500/30 transition-all duration-200 hover:scale-110 hover:bg-emerald-400 active:scale-95"
         >
           <Plus className="h-6 w-6" strokeWidth={3} />

@@ -2,6 +2,7 @@
 
 import { X, Star } from 'lucide-react';
 import { useExercises } from '@/context/ExercisesContext';
+import { useEscapeClose } from '@/lib/useEscapeClose';
 import type { ExerciseCategory } from '@/types';
 import { categoryStyle } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ interface FavoritesModalProps {
 
 export default function FavoritesModal({ open, onClose, favorites, onToggle }: FavoritesModalProps) {
   const exercises = useExercises();
+  useEscapeClose(open, onClose);
   if (!open) return null;
 
   const categories: ExerciseCategory[] = ['reps', 'static', 'weighted'];

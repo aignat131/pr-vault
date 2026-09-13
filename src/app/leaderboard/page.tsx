@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   collection,
   query,
@@ -8,8 +8,6 @@ import {
   orderBy,
   limit,
   getDocs,
-  doc,
-  getDoc,
 } from 'firebase/firestore';
 import { ExternalLink, Crown, Medal, Award, ChevronLeft, Settings2, Star, CheckCircle2, Search, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
@@ -52,12 +50,29 @@ export default function LeaderboardPage() {
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set(DEFAULT_FAVORITES));
   const [activeTab, setActiveTab] = useState<string>(allTabs[0]?.id ?? 'pull-ups');
-  const [genderFilter, setGenderFilter] = useState<GenderFilter>('all');
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.LEADERBOARD_GENDER);
+      if (stored === 'female') return 'female';
+    } catch { /* ignore */ }
+    return 'all';
+  });
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [favModalOpen, setFavModalOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+
+  // Persist gender filter
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEYS.LEADERBOARD_GENDER, genderFilter); } catch { /* ignore */ }
+  }, [genderFilter]);
+
+  // Scroll active tab into view
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [activeTab]);
 
   // Load favorites from localStorage
   useEffect(() => {
@@ -108,34 +123,17 @@ export default function LeaderboardPage() {
       const snap = await getDocs(q);
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
 
-      // Deduplicate: keep only the highest score per user
+      // Deduplicate: keep only the highest score per user, skip hidden users
       const byUser = new Map<string, PRRecord>();
       for (const rec of docs) {
+        if ((rec as PRRecord & { hideFromLeaderboard?: boolean }).hideFromLeaderboard) continue;
         const existing = byUser.get(rec.userId);
         if (!existing || rec.score > existing.score) {
           byUser.set(rec.userId, rec);
         }
       }
 
-      // Filter out users who have hideFromLeaderboard enabled
-      const userIds = Array.from(byUser.keys());
-      const hiddenUsers = new Set<string>();
-      await Promise.all(
-        userIds.map(async (uid) => {
-          try {
-            const userDoc = await getDoc(doc(getClientDb(), 'users', uid));
-            if (userDoc.exists() && userDoc.data().hideFromLeaderboard === true) {
-              hiddenUsers.add(uid);
-            }
-          } catch {
-            // ignore — user doc might not exist
-          }
-        }),
-      );
-
-      const deduped = Array.from(byUser.values())
-        .filter((r) => !hiddenUsers.has(r.userId))
-        .sort((a, b) => b.score - a.score);
+      const deduped = Array.from(byUser.values()).sort((a, b) => b.score - a.score);
 
       setRecords(deduped);
     } catch {
@@ -217,6 +215,7 @@ export default function LeaderboardPage() {
             return (
               <button
                 key={tab.id}
+                ref={active ? activeTabRef : undefined}
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-200 ${
                   active
@@ -244,9 +243,12 @@ export default function LeaderboardPage() {
           </div>
         ) : records.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
-            <p className="text-sm text-white/40">No records yet</p>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06]">
+              <Crown className="h-5 w-5 text-white/20" />
+            </div>
+            <p className="text-sm font-medium text-white/40">No records yet</p>
             <p className="mt-1 text-xs text-white/25">
-              Be the first to set a PR!
+              Be the first to set a {exercises.find((e) => e.id === activeTab)?.name ?? ''} record!
             </p>
           </div>
         ) : (

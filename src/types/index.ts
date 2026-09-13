@@ -28,6 +28,7 @@ export interface PRRecord {
   formVerified?: boolean;
   validated?: boolean;
   isNewPR?: boolean;
+  reactions?: number;
   createdAt: Timestamp;
 }
 
@@ -64,6 +65,7 @@ export interface Feedback {
   type: FeedbackType;
   message: string;
   status: FeedbackStatus;
+  adminReply?: string;
   createdAt: Timestamp;
 }
 

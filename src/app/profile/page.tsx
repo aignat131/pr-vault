@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check, MessageSquare, Settings } from 'lucide-react';
+import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check, MessageSquare, Settings, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -15,9 +15,12 @@ import FeedbackModal from '@/components/FeedbackModal';
 import SettingsModal from '@/components/SettingsModal';
 import ProgressGraphs from '@/components/ProgressGraphs';
 import ValidationRequestButton from '@/components/ValidationRequestButton';
+import UserValidations from '@/components/UserValidations';
+import BadgeRow from '@/components/BadgeRow';
 import { categoryStyle, formatScore, useWeightUnit } from '@/lib/utils';
 import { STORAGE_KEYS } from '@/lib/constants';
 import { useRoles } from '@/context/RolesContext';
+import { useToast } from '@/context/ToastContext';
 
 function formatMemberSince(dateStr: string | undefined): string {
   if (!dateStr) return '—';
@@ -25,9 +28,43 @@ function formatMemberSince(dateStr: string | undefined): string {
   return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+function getWeekNumber(date: Date): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const yearStart = new Date(d.getFullYear(), 0, 1);
+  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${d.getFullYear()}-W${weekNo}`;
+}
+
+function computeStreak(records: PRRecord[]): number {
+  if (records.length === 0) return 0;
+  const weeks = new Set(
+    records.map((r) => getWeekNumber(new Date(r.createdAt.seconds * 1000))),
+  );
+  const now = new Date();
+  let streak = 0;
+  let d = new Date(now);
+  // Check current week and go backwards
+  for (let i = 0; i < 52; i++) {
+    const w = getWeekNumber(d);
+    if (weeks.has(w)) {
+      streak++;
+      d.setDate(d.getDate() - 7);
+    } else if (i === 0) {
+      // Current week might not have a PR yet, skip it
+      d.setDate(d.getDate() - 7);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 export default function ProfilePage() {
   const { user, loading, loginWithGoogle, logout } = useAuth();
   const { hasAnyRole, userRole } = useRoles();
+  const { toast } = useToast();
   const exercises = useExercises();
   const weightUnit = useWeightUnit();
   const [records, setRecords] = useState<PRRecord[]>([]);
@@ -64,8 +101,10 @@ export default function ProfilePage() {
     try {
       await deleteDoc(doc(getClientDb(), 'records', recordId));
       setRefreshKey((k) => k + 1);
+      toast('PR deleted.');
     } catch (err) {
       console.error('[Profile] Failed to delete PR:', err);
+      toast('Failed to delete PR.', 'error');
     } finally {
       setDeletingId(null);
     }
@@ -171,6 +210,7 @@ export default function ProfilePage() {
   const prMap = new Map(records.map((r) => [r.exerciseId, r]));
   const categories: ExerciseCategory[] = ['reps', 'static', 'weighted'];
   const categoriesWithPRs = new Set(records.map((r) => r.category));
+  const streak = computeStreak(records);
 
   return (
     <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
@@ -251,14 +291,22 @@ export default function ProfilePage() {
           label="Member since"
         />
         <StatCard
-          icon={<Layers className="h-4 w-4 text-amber-400" />}
-          value={`${categoriesWithPRs.size}/3`}
-          label="Categories"
+          icon={<Zap className="h-4 w-4 text-amber-400" />}
+          value={`${streak}w`}
+          label="PR Streak"
         />
       </section>
 
+      {/* Badges */}
+      <BadgeRow records={records} />
+
       {/* Progress Graphs */}
       {records.length > 0 && <ProgressGraphs records={records} />}
+
+      {/* User Validations */}
+      {validations.size > 0 && (
+        <UserValidations validations={Array.from(validations.values())} />
+      )}
 
       {/* Personal Bests — only exercises with PRs */}
       {fetching ? (

@@ -5,6 +5,8 @@ import { addDoc, collection, Timestamp } from 'firebase/firestore';
 import { X, Loader2 } from 'lucide-react';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { useEscapeClose } from '@/lib/useEscapeClose';
 import type { FeedbackType } from '@/types';
 
 const feedbackTypes: { value: FeedbackType; label: string; style: string; activeStyle: string }[] = [
@@ -20,6 +22,7 @@ interface FeedbackModalProps {
 
 export default function FeedbackModal({ open, onClose }: FeedbackModalProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [type, setType] = useState<FeedbackType>('general');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -53,6 +56,7 @@ export default function FeedbackModal({ open, onClose }: FeedbackModalProps) {
         createdAt: Timestamp.now(),
       });
       setSuccess(true);
+      toast('Feedback sent. Thank you!');
       setTimeout(() => {
         setSuccess(false);
         setMessage('');
@@ -61,11 +65,14 @@ export default function FeedbackModal({ open, onClose }: FeedbackModalProps) {
       }, 1500);
     } catch (err) {
       console.error('[Feedback] Failed to submit:', err);
+      toast('Failed to submit feedback.', 'error');
       setError('Failed to submit feedback. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [user, message, type, onClose]);
+  }, [user, message, type, onClose, toast]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) return null;
 

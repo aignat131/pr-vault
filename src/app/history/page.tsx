@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { ChevronLeft } from 'lucide-react';
+import { collection, query, orderBy, limit, getDocs, where, startAfter, type QueryDocumentSnapshot } from 'firebase/firestore';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import PRCard from '@/components/PRCard';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
-import type { PRRecord } from '@/types';
+import type { PRRecord, ExerciseCategory } from '@/types';
 
 function formatRelativeTime(seconds: number): string {
   const now = Date.now();
@@ -25,32 +25,52 @@ function formatRelativeTime(seconds: number): string {
   });
 }
 
+type CategoryFilter = 'all' | ExerciseCategory;
+
+const PAGE_SIZE = 20;
+
 export default function HistoryPage() {
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
 
-  const fetchHistory = useCallback(async () => {
-    setLoading(true);
+  const fetchHistory = useCallback(async (reset = true) => {
+    if (reset) {
+      setLoading(true);
+      setLastDoc(null);
+    } else {
+      setLoadingMore(true);
+    }
     try {
-      const q = query(
-        collection(getClientDb(), 'records'),
+      const constraints = [
+        ...(categoryFilter !== 'all' ? [where('category', '==', categoryFilter)] : []),
         orderBy('createdAt', 'desc'),
-        limit(50),
-      );
+        limit(PAGE_SIZE),
+        ...(!reset && lastDoc ? [startAfter(lastDoc)] : []),
+      ];
+      const q = query(collection(getClientDb(), 'records'), ...constraints);
       const snap = await getDocs(q);
-      setRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord));
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
+      setRecords((prev) => reset ? docs : [...prev, ...docs]);
     } catch (err) {
       console.error('[History] Firestore query failed:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [categoryFilter, lastDoc]);
 
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory, refreshKey]);
+    fetchHistory(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryFilter, refreshKey]);
 
   return (
     <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
@@ -72,6 +92,23 @@ export default function HistoryPage() {
         </div>
       </header>
 
+      {/* Category filters */}
+      <div className="flex gap-1.5 px-5 mt-3 md:px-8">
+        {(['all', 'reps', 'static', 'weighted'] as const).map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setCategoryFilter(cat)}
+            className={`rounded-full px-3.5 py-1.5 text-[11px] font-semibold transition-all duration-200 ${
+              categoryFilter === cat
+                ? 'bg-white text-black'
+                : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
+            }`}
+          >
+            {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+          </button>
+        ))}
+      </div>
+
       {/* Activity feed */}
       <section className="mt-4 px-5 md:px-8">
         {loading ? (
@@ -80,9 +117,14 @@ export default function HistoryPage() {
           </div>
         ) : records.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center">
-            <p className="text-sm text-white/40">No records yet</p>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.06]">
+              <Loader2 className="h-5 w-5 text-white/20" />
+            </div>
+            <p className="text-sm font-medium text-white/40">No activity yet</p>
             <p className="mt-1 text-xs text-white/25">
-              Be the first to set a PR!
+              {categoryFilter !== 'all'
+                ? `No ${categoryFilter} records found. Try a different filter!`
+                : 'Community PRs will show up here once people start training!'}
             </p>
           </div>
         ) : (
@@ -95,6 +137,23 @@ export default function HistoryPage() {
                 <PRCard record={record} />
               </div>
             ))}
+
+            {hasMore && (
+              <button
+                onClick={() => fetchHistory(false)}
+                disabled={loadingMore}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.03] py-3 text-sm font-medium text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white/70 disabled:opacity-50"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            )}
           </div>
         )}
       </section>

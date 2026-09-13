@@ -1,6 +1,9 @@
 'use client';
 
-import { ExternalLink, Share2, ShieldCheck } from 'lucide-react';
+import { useState } from 'react';
+import { ExternalLink, Share2, ShieldCheck, Flame } from 'lucide-react';
+import { doc, updateDoc, increment } from 'firebase/firestore';
+import { getClientDb } from '@/lib/firebase';
 import type { PRRecord, WeightUnit } from '@/types';
 import { categoryStyle, formatScoreUpper as formatScoreDisplay, formatScore, formatDate, useWeightUnit } from '@/lib/utils';
 
@@ -11,6 +14,23 @@ interface PRCardProps {
 export default function PRCard({ record }: PRCardProps) {
   const style = categoryStyle[record.category];
   const weightUnit = useWeightUnit();
+  const [reactions, setReactions] = useState(record.reactions ?? 0);
+  const [reacting, setReacting] = useState(false);
+
+  const handleReact = async () => {
+    if (!record.id || reacting) return;
+    setReacting(true);
+    setReactions((r) => r + 1);
+    try {
+      await updateDoc(doc(getClientDb(), 'records', record.id), {
+        reactions: increment(1),
+      });
+    } catch {
+      setReactions((r) => r - 1);
+    } finally {
+      setReacting(false);
+    }
+  };
 
   return (
     <div
@@ -93,6 +113,18 @@ export default function PRCard({ record }: PRCardProps) {
             </a>
           )}
           <button
+            onClick={handleReact}
+            className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium transition-colors ${
+              reactions > 0
+                ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
+                : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70'
+            }`}
+            aria-label="React with fire"
+          >
+            <Flame className="h-3 w-3" />
+            {reactions > 0 && <span>{reactions}</span>}
+          </button>
+          <button
             onClick={() => {
               const text = `${record.username} hit ${formatScore(record)} on ${record.exerciseName}!`;
               if (navigator.share) {
@@ -101,6 +133,7 @@ export default function PRCard({ record }: PRCardProps) {
                 navigator.clipboard.writeText(text);
               }
             }}
+            aria-label="Share this PR"
             className="rounded-full bg-white/5 p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white/70"
           >
             <Share2 className="h-3 w-3" />

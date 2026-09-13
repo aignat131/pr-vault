@@ -6,6 +6,8 @@ import { X, Loader2, Trash2 } from 'lucide-react';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { STORAGE_KEYS } from '@/lib/constants';
+import { useToast } from '@/context/ToastContext';
+import { useEscapeClose } from '@/lib/useEscapeClose';
 import type { WeightUnit } from '@/types';
 
 interface SettingsModalProps {
@@ -16,6 +18,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal({ open, onClose, onSettingsChanged }: SettingsModalProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg');
   const [hideFromLeaderboard, setHideFromLeaderboard] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -53,8 +56,19 @@ export default function SettingsModal({ open, onClose, onSettingsChanged }: Sett
   };
 
   const handleHideLeaderboard = async (hide: boolean) => {
+    if (!user) return;
     setHideFromLeaderboard(hide);
     await saveField('hideFromLeaderboard', hide);
+    // Denormalize onto all user's records for efficient leaderboard filtering
+    try {
+      const q = query(collection(getClientDb(), 'records'), where('userId', '==', user.uid));
+      const snap = await getDocs(q);
+      await Promise.all(
+        snap.docs.map((d) => setDoc(d.ref, { hideFromLeaderboard: hide }, { merge: true })),
+      );
+    } catch (err) {
+      console.error('[Settings] Failed to update records:', err);
+    }
   };
 
   const handleClearHistory = async () => {
@@ -66,13 +80,17 @@ export default function SettingsModal({ open, onClose, onSettingsChanged }: Sett
       const snap = await getDocs(q);
       const deletes = snap.docs.map((d) => deleteDoc(d.ref));
       await Promise.all(deletes);
+      toast('Progress history cleared.');
       onSettingsChanged?.();
     } catch (err) {
       console.error('[Settings] Failed to clear history:', err);
+      toast('Failed to clear history.', 'error');
     } finally {
       setClearing(false);
     }
   };
+
+  useEscapeClose(open, onClose);
 
   if (!open) return null;
 
@@ -90,6 +108,7 @@ export default function SettingsModal({ open, onClose, onSettingsChanged }: Sett
             <h2 className="text-lg font-bold text-white">Settings</h2>
             <button
               onClick={onClose}
+              aria-label="Close settings"
               className="rounded-full p-1.5 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
             >
               <X className="h-5 w-5" />
@@ -131,6 +150,8 @@ export default function SettingsModal({ open, onClose, onSettingsChanged }: Sett
                 </span>
                 <button
                   onClick={() => handleHideLeaderboard(!hideFromLeaderboard)}
+                  role="switch"
+                  aria-checked={hideFromLeaderboard}
                   className="flex w-full items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-3"
                 >
                   <div className="text-left">

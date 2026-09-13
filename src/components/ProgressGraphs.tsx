@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   collection,
   query,
@@ -33,6 +33,9 @@ interface ChartProps {
 }
 
 function MiniChart({ points, category, unit }: ChartProps) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; score: number; date: string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   if (points.length === 0) return null;
 
   const color = categoryColors[category];
@@ -54,11 +57,11 @@ function MiniChart({ points, category, unit }: ChartProps) {
     );
   }
 
-  // Chart dimensions
-  const W = 280;
-  const H = 120;
+  // Chart dimensions — responsive via viewBox
+  const W = 320;
+  const H = 140;
   const padX = 36;
-  const padY = 20;
+  const padY = 22;
   const chartW = W - padX * 2;
   const chartH = H - padY * 2;
 
@@ -74,62 +77,98 @@ function MiniChart({ points, category, unit }: ChartProps) {
 
   const polyline = coords.map((c) => `${c.x},${c.y}`).join(' ');
 
-  // Grid lines (3 horizontal)
-  const gridLines = [0, 0.5, 1].map((frac) => padY + chartH - frac * chartH);
+  // Grid lines (5 horizontal)
+  const gridFracs = [0, 0.25, 0.5, 0.75, 1];
+  const gridLines = gridFracs.map((frac) => ({
+    y: padY + chartH - frac * chartH,
+    value: Math.round(minScore + frac * scoreRange),
+  }));
+
+  const handlePointClick = (i: number) => {
+    setTooltip(
+      tooltip?.score === points[i].score && tooltip?.date === formatShortDate(points[i].date)
+        ? null
+        : { x: coords[i].x, y: coords[i].y, score: points[i].score, date: formatShortDate(points[i].date) },
+    );
+  };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet">
-      {/* Grid lines */}
-      {gridLines.map((y, i) => (
-        <line
-          key={i}
-          x1={padX}
-          y1={y}
-          x2={W - padX}
-          y2={y}
-          stroke="rgba(255,255,255,0.06)"
-          strokeDasharray="4,4"
+    <div ref={containerRef} className="relative" aria-label="Progress chart">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="xMidYMid meet">
+        {/* Grid lines */}
+        {gridLines.map((g, i) => (
+          <g key={i}>
+            <line
+              x1={padX}
+              y1={g.y}
+              x2={W - padX}
+              y2={g.y}
+              stroke="rgba(255,255,255,0.06)"
+              strokeDasharray="4,4"
+            />
+            <text x={padX - 4} y={g.y + 3} textAnchor="end" fill="rgba(255,255,255,0.25)" fontSize="8">
+              {g.value}
+            </text>
+          </g>
+        ))}
+
+        {/* Line */}
+        <polyline
+          points={polyline}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
-      ))}
 
-      {/* Y-axis labels */}
-      <text x={padX - 4} y={padY + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9">
-        {maxScore}
-      </text>
-      <text x={padX - 4} y={padY + chartH + 4} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="9">
-        {minScore}
-      </text>
+        {/* Area fill */}
+        <polygon
+          points={`${coords[0].x},${padY + chartH} ${polyline} ${coords[coords.length - 1].x},${padY + chartH}`}
+          fill={`${color}`}
+          opacity="0.08"
+        />
 
-      {/* Line */}
-      <polyline
-        points={polyline}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+        {/* Data points — clickable for tooltip */}
+        {coords.map((c, i) => (
+          <circle
+            key={i}
+            cx={c.x}
+            cy={c.y}
+            r="4.5"
+            fill={color}
+            className="cursor-pointer"
+            opacity={tooltip?.score === points[i].score && tooltip?.date === formatShortDate(points[i].date) ? 1 : 0.8}
+            stroke={tooltip?.score === points[i].score && tooltip?.date === formatShortDate(points[i].date) ? '#fff' : 'none'}
+            strokeWidth="1.5"
+            onClick={() => handlePointClick(i)}
+          />
+        ))}
 
-      {/* Area fill */}
-      <polygon
-        points={`${coords[0].x},${padY + chartH} ${polyline} ${coords[coords.length - 1].x},${padY + chartH}`}
-        fill={`${color}`}
-        opacity="0.08"
-      />
+        {/* X-axis date labels (first and last) */}
+        <text x={coords[0].x} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="8">
+          {formatShortDate(points[0].date)}
+        </text>
+        <text x={coords[coords.length - 1].x} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="8">
+          {formatShortDate(points[points.length - 1].date)}
+        </text>
+      </svg>
 
-      {/* Data points */}
-      {coords.map((c, i) => (
-        <circle key={i} cx={c.x} cy={c.y} r="3" fill={color} />
-      ))}
-
-      {/* X-axis date labels (first and last) */}
-      <text x={coords[0].x} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="8">
-        {formatShortDate(points[0].date)}
-      </text>
-      <text x={coords[coords.length - 1].x} y={H - 2} textAnchor="middle" fill="rgba(255,255,255,0.3)" fontSize="8">
-        {formatShortDate(points[points.length - 1].date)}
-      </text>
-    </svg>
+      {/* Tooltip */}
+      {tooltip && (
+        <div
+          className="absolute pointer-events-none rounded-lg border border-white/10 bg-zinc-800/95 px-2.5 py-1.5 shadow-xl backdrop-blur-sm"
+          style={{
+            left: `${(tooltip.x / W) * 100}%`,
+            top: `${(tooltip.y / H) * 100 - 12}%`,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <p className="text-[11px] font-bold text-white">{tooltip.score} {unit}</p>
+          <p className="text-[9px] text-white/50">{tooltip.date}</p>
+        </div>
+      )}
+    </div>
   );
 }
 

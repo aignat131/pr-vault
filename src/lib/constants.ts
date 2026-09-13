@@ -9,4 +9,5 @@ export const STORAGE_KEYS = {
   ONBOARDING_COMPLETE: 'pr-vault-onboarding-complete',
   SHOWCASE: 'pr-vault-showcase-exercises',
   WEIGHT_UNIT: 'pr-vault-weight-unit',
+  LEADERBOARD_GENDER: 'pr-vault-leaderboard-gender',
 } as const;

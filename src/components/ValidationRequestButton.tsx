@@ -5,6 +5,7 @@ import { setDoc, doc, Timestamp } from 'firebase/firestore';
 import { ShieldCheck, Clock, XCircle, Loader2 } from 'lucide-react';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 import { MAX_ACTIVE_VALIDATIONS } from '@/lib/constants';
 import type { PRRecord, ValidationRequest, ValidationStatus } from '@/types';
 
@@ -22,6 +23,7 @@ export default function ValidationRequestButton({
   onRequested,
 }: ValidationRequestButtonProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
   // Don't show if no video
@@ -49,9 +51,11 @@ export default function ValidationRequestButton({
         reviewNote: null,
         createdAt: Timestamp.now(),
       });
+      toast('Validation requested.');
       onRequested();
     } catch (err) {
       console.error('[Validation] Failed to request:', err);
+      toast('Failed to request validation.', 'error');
     } finally {
       setLoading(false);
     }
@@ -81,19 +85,26 @@ export default function ValidationRequestButton({
   if (validation?.status === 'rejected') {
     const limitReached = pendingCount >= MAX_ACTIVE_VALIDATIONS;
     return (
-      <button
-        onClick={handleRequest}
-        disabled={loading || limitReached}
-        className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400 transition-colors hover:bg-red-500/25 disabled:opacity-40"
-        title={limitReached ? `Max ${MAX_ACTIVE_VALIDATIONS} pending requests` : 'Re-request validation'}
-      >
-        {loading ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
-        ) : (
-          <XCircle className="h-3 w-3" />
+      <div className="flex flex-col items-end gap-0.5">
+        <button
+          onClick={handleRequest}
+          disabled={loading || limitReached}
+          className="flex items-center gap-1 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-400 transition-colors hover:bg-red-500/25 disabled:opacity-40"
+          title={limitReached ? `Max ${MAX_ACTIVE_VALIDATIONS} pending requests` : 'Re-request validation'}
+        >
+          {loading ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <XCircle className="h-3 w-3" />
+          )}
+          Retry
+        </button>
+        {validation.reviewNote && (
+          <p className="max-w-[160px] text-[9px] text-red-400/70 italic leading-tight">
+            {validation.reviewNote}
+          </p>
         )}
-        Retry
-      </button>
+      </div>
     );
   }
 

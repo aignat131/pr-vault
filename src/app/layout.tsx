@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
 import { RolesProvider } from "@/context/RolesContext";
 import { ExercisesProvider } from "@/context/ExercisesContext";
+import { ToastProvider } from "@/context/ToastContext";
+import ToastContainer from "@/components/Toast";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,7 +49,12 @@ export default function RootLayout({
       <body className="min-h-dvh flex flex-col bg-[#09090b] text-white overflow-x-hidden">
         <AuthProvider>
           <RolesProvider>
-            <ExercisesProvider>{children}</ExercisesProvider>
+            <ExercisesProvider>
+              <ToastProvider>
+                {children}
+                <ToastContainer />
+              </ToastProvider>
+            </ExercisesProvider>
           </RolesProvider>
         </AuthProvider>
       </body>

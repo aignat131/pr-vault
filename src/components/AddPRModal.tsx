@@ -8,6 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
 import { STORAGE_KEYS } from '@/lib/constants';
 import { categoryStyle, useWeightUnit } from '@/lib/utils';
+import { useToast } from '@/context/ToastContext';
+import { useEscapeClose } from '@/lib/useEscapeClose';
 import confetti from 'canvas-confetti';
 import type { Exercise } from '@/types';
 
@@ -21,6 +23,7 @@ interface AddPRModalProps {
 
 export default function AddPRModal({ open, onClose, onSave, gender: genderProp, defaultExerciseId }: AddPRModalProps) {
   const { user } = useAuth();
+  const { toast } = useToast();
   const exercises = useExercises();
   const weightUnit = useWeightUnit();
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
@@ -168,15 +171,19 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
       }
 
       confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+      toast('PR saved! New personal best.');
       onSave?.();
       onClose();
     } catch (err) {
       console.error('[AddPR] Firestore write failed:', err);
+      toast('Failed to save PR.', 'error');
       setError(err instanceof Error ? err.message : 'Failed to save PR.');
     } finally {
       setLoading(false);
     }
-  }, [user, score, addedWeight, videoUrl, selectedExercise, onClose, onSave, genderProp]);
+  }, [user, score, addedWeight, videoUrl, selectedExercise, onClose, onSave, genderProp, toast]);
+
+  useEscapeClose(open, onClose);
 
   if (!open) return null;
   if (!selectedExercise) {

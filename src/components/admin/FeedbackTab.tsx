@@ -40,6 +40,8 @@ export default function FeedbackTab() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replying, setReplying] = useState(false);
 
   const fetchFeedback = useCallback(async () => {
     try {
@@ -73,10 +75,28 @@ export default function FeedbackTab() {
   };
 
   const handleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
-    const item = items.find((f) => f.id === id);
-    if (item && item.status === 'new') {
-      markAsRead(id);
+    const isClosing = expandedId === id;
+    setExpandedId(isClosing ? null : id);
+    if (!isClosing) {
+      const item = items.find((f) => f.id === id);
+      if (item && item.status === 'new') markAsRead(id);
+      setReplyText(item?.adminReply ?? '');
+    }
+  };
+
+  const sendReply = async (id: string) => {
+    const text = replyText.trim();
+    if (!text) return;
+    setReplying(true);
+    try {
+      await updateDoc(doc(getClientDb(), 'feedback', id), { adminReply: text });
+      setItems((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, adminReply: text } : f)),
+      );
+    } catch (err) {
+      console.error('[Feedback] Failed to send reply:', err);
+    } finally {
+      setReplying(false);
     }
   };
 
@@ -128,10 +148,10 @@ export default function FeedbackTab() {
             const BadgeIcon = badge.icon;
             const isExpanded = expandedId === item.id;
             return (
-              <button
+              <div
                 key={item.id}
                 onClick={() => handleExpand(item.id!)}
-                className={`w-full text-left rounded-2xl border p-4 transition-all ${
+                className={`w-full text-left rounded-2xl border p-4 transition-all cursor-pointer ${
                   item.status === 'new'
                     ? 'border-emerald-500/20 bg-emerald-500/[0.03]'
                     : 'border-white/[0.08] bg-white/[0.03]'
@@ -169,9 +189,35 @@ export default function FeedbackTab() {
                     <p className="mt-1.5 text-[10px] text-white/30">
                       {item.createdAt && formatTimestamp(item.createdAt as unknown as { seconds: number })}
                     </p>
+                    {!isExpanded && item.adminReply && (
+                      <p className="mt-1 text-[10px] text-emerald-400/60 italic">Replied</p>
+                    )}
                   </div>
                 </div>
-              </button>
+
+                {/* Reply section (expanded) */}
+                {isExpanded && (
+                  <div className="mt-3 pt-3 border-t border-white/[0.06]" onClick={(e) => e.stopPropagation()}>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                      Admin Reply
+                    </label>
+                    <textarea
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Write a reply..."
+                      rows={2}
+                      className="mt-1 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-xs text-white placeholder-white/30 outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 resize-none"
+                    />
+                    <button
+                      onClick={() => sendReply(item.id!)}
+                      disabled={replying || !replyText.trim()}
+                      className="mt-1.5 rounded-full bg-emerald-500 px-4 py-1.5 text-[11px] font-semibold text-black transition-all hover:bg-emerald-400 disabled:opacity-40"
+                    >
+                      {replying ? 'Sending...' : item.adminReply ? 'Update Reply' : 'Send Reply'}
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

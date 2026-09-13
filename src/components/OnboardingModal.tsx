@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Star, ChevronRight } from 'lucide-react';
 import { useExercises } from '@/context/ExercisesContext';
+import { useEscapeClose } from '@/lib/useEscapeClose';
 import type { ExerciseCategory } from '@/types';
 import { categoryStyle } from '@/lib/utils';
 import { STORAGE_KEYS } from '@/lib/constants';
@@ -23,6 +24,7 @@ const SUGGESTED_FAVORITES = [
 
 export default function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   const exercises = useExercises();
+  useEscapeClose(open, onComplete);
   const [selected, setSelected] = useState<Set<string>>(new Set(SUGGESTED_FAVORITES));
 
   if (!open) return null;
