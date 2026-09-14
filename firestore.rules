@@ -40,6 +40,10 @@ service cloud.firestore {
       return isOwner() || hasRole('moderator') || hasRole('reviewer');
     }
 
+    function onlyReactedByChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy']);
+    }
+
     // ── PR records ──
     match /records/{docId} {
       allow read: if isSignedIn();
@@ -49,7 +53,8 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.userId
             || isOwner()
             || canReviewForms()
-            || canReviewValidations());
+            || canReviewValidations()
+            || onlyReactedByChanged());
       allow delete: if isSignedIn()
         && (request.auth.uid == resource.data.userId || isOwner());
     }

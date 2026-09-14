@@ -5,6 +5,7 @@ import { collection, query, orderBy, limit, getDocs, where, startAfter, type Que
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
 import PRCard from '@/components/PRCard';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
@@ -30,6 +31,7 @@ type CategoryFilter = 'all' | ExerciseCategory;
 const PAGE_SIZE = 20;
 
 export default function HistoryPage() {
+  const { user } = useAuth();
   const [records, setRecords] = useState<PRRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -73,7 +75,7 @@ export default function HistoryPage() {
   }, [categoryFilter, refreshKey]);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
+    <div className="flex min-h-dvh flex-col bg-[#09090b] pb-28 w-full max-w-2xl mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-2 md:px-8">
         <div className="flex items-center gap-3">
@@ -110,7 +112,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Activity feed */}
-      <section className="mt-4 px-5 md:px-8">
+      <section className="mt-4 flex-1 px-5 md:px-8">
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
@@ -128,13 +130,13 @@ export default function HistoryPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-2 md:gap-4">
             {records.map((record) => (
               <div key={record.id}>
                 <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-white/30">
                   {record.createdAt && formatRelativeTime(record.createdAt.seconds)}
                 </p>
-                <PRCard record={record} />
+                <PRCard record={record} currentUserId={user?.uid ?? null} />
               </div>
             ))}
 

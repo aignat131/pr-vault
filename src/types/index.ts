@@ -29,6 +29,7 @@ export interface PRRecord {
   validated?: boolean;
   isNewPR?: boolean;
   reactions?: number;
+  reactedBy?: string[];
   createdAt: Timestamp;
 }
 

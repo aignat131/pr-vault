@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, query, where, getDocs, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
-import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check, MessageSquare, Settings, Zap } from 'lucide-react';
+import { LogOut, Flame, Calendar, Layers, Shield, Trash2, Share2, Link2, Check, MessageSquare, Settings, Zap, ChevronDown, ChevronUp, User } from 'lucide-react';
 import Link from 'next/link';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -16,7 +16,6 @@ import SettingsModal from '@/components/SettingsModal';
 import ProgressGraphs from '@/components/ProgressGraphs';
 import ValidationRequestButton from '@/components/ValidationRequestButton';
 import UserValidations from '@/components/UserValidations';
-import BadgeRow from '@/components/BadgeRow';
 import { categoryStyle, formatScore, useWeightUnit } from '@/lib/utils';
 import { STORAGE_KEYS } from '@/lib/constants';
 import { useRoles } from '@/context/RolesContext';
@@ -78,6 +77,8 @@ export default function ProfilePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [validations, setValidations] = useState<Map<string, ValidationRequest>>(new Map());
   const [pendingValidationCount, setPendingValidationCount] = useState(0);
+  const [personalInfoExpanded, setPersonalInfoExpanded] = useState(false);
+  const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
 
   const handleInvite = async () => {
     const url = window.location.origin;
@@ -120,6 +121,9 @@ export default function ProfilePage() {
           setGender(data.gender);
           localStorage.setItem(STORAGE_KEYS.GENDER, data.gender);
         }
+        if (data.dateOfBirth) {
+          setDateOfBirth(data.dateOfBirth);
+        }
       }
     }).catch((err) => console.error('[Profile] Failed to load gender:', err));
   }, [user]);
@@ -129,6 +133,12 @@ export default function ProfilePage() {
     setGender(g);
     localStorage.setItem(STORAGE_KEYS.GENDER, g);
     await setDoc(doc(getClientDb(), 'users', user.uid), { gender: g }, { merge: true });
+  };
+
+  const updateDateOfBirth = async (dob: string) => {
+    if (!user) return;
+    setDateOfBirth(dob);
+    await setDoc(doc(getClientDb(), 'users', user.uid), { dateOfBirth: dob }, { merge: true });
   };
 
   useEffect(() => {
@@ -182,7 +192,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] max-w-2xl mx-auto">
+      <div className="flex min-h-dvh items-center justify-center bg-[#09090b] w-full max-w-2xl mx-auto">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
       </div>
     );
@@ -213,7 +223,7 @@ export default function ProfilePage() {
   const streak = computeStreak(records);
 
   return (
-    <div className="min-h-dvh bg-[#09090b] pb-28 max-w-2xl mx-auto">
+    <div className="flex min-h-dvh flex-col bg-[#09090b] pb-28 w-full max-w-2xl mx-auto">
       {/* Header */}
       <header className="px-5 pt-12 pb-2 md:px-8">
         <p className="text-xs font-medium uppercase tracking-widest text-white/40">
@@ -239,23 +249,6 @@ export default function ProfilePage() {
             {userRole.replace('_', ' ')}
           </span>
         )}
-
-        {/* Gender selector */}
-        <div className="mt-4 flex items-center gap-2">
-          {(['male', 'female'] as const).map((g) => (
-            <button
-              key={g}
-              onClick={() => updateGender(g)}
-              className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
-                gender === g
-                  ? 'bg-emerald-500 text-black'
-                  : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
-              }`}
-            >
-              {g === 'male' ? 'Male' : 'Female'}
-            </button>
-          ))}
-        </div>
 
         {/* Admin link + Settings */}
         <div className="mt-4 flex items-center gap-2">
@@ -297,8 +290,62 @@ export default function ProfilePage() {
         />
       </section>
 
-      {/* Badges */}
-      <BadgeRow records={records} />
+      {/* Personal Info */}
+      <section className="px-5 md:px-8 mb-6">
+        <button
+          onClick={() => setPersonalInfoExpanded(!personalInfoExpanded)}
+          className="flex w-full items-center justify-between mb-3"
+        >
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+            <User className="h-4 w-4 text-emerald-400" />
+            Personal Info
+          </h3>
+          {personalInfoExpanded ? (
+            <ChevronUp className="h-4 w-4 text-white/30" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-white/30" />
+          )}
+        </button>
+
+        {personalInfoExpanded && (
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4 space-y-4">
+            {/* Gender */}
+            <div>
+              <span className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+                Gender
+              </span>
+              <div className="flex gap-2">
+                {(['male', 'female'] as const).map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => updateGender(g)}
+                    className={`rounded-full px-4 py-1.5 text-xs font-semibold transition-all duration-200 ${
+                      gender === g
+                        ? 'bg-emerald-500 text-black'
+                        : 'bg-white/[0.06] text-white/40 hover:bg-white/10 hover:text-white/70'
+                    }`}
+                  >
+                    {g === 'male' ? 'Male' : 'Female'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date of Birth */}
+            <div>
+              <span className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/50">
+                Date of Birth
+              </span>
+              <input
+                type="date"
+                value={dateOfBirth ?? ''}
+                onChange={(e) => updateDateOfBirth(e.target.value)}
+                className="w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2.5 text-sm text-white/90 outline-none transition-colors focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30 [color-scheme:dark]"
+              />
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Progress Graphs */}
       {records.length > 0 && <ProgressGraphs records={records} />}

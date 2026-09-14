@@ -218,7 +218,7 @@ export default function HomePage() {
             ) : displayRecords.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2 md:gap-4">
                 {displayRecords.map((record) => (
-                  <PRCard key={record.id} record={record} />
+                  <PRCard key={record.id} record={record} currentUserId={user?.uid ?? null} />
                 ))}
               </div>
             ) : (

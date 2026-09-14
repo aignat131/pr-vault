@@ -2,31 +2,48 @@
 
 import { useState } from 'react';
 import { ExternalLink, Share2, ShieldCheck, Flame } from 'lucide-react';
-import { doc, updateDoc, increment } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import type { PRRecord, WeightUnit } from '@/types';
 import { categoryStyle, formatScoreUpper as formatScoreDisplay, formatScore, formatDate, useWeightUnit } from '@/lib/utils';
 
 interface PRCardProps {
   record: PRRecord;
+  currentUserId?: string | null;
 }
 
-export default function PRCard({ record }: PRCardProps) {
+export default function PRCard({ record, currentUserId }: PRCardProps) {
   const style = categoryStyle[record.category];
   const weightUnit = useWeightUnit();
-  const [reactions, setReactions] = useState(record.reactions ?? 0);
+  const [reactedBy, setReactedBy] = useState<string[]>(record.reactedBy ?? []);
   const [reacting, setReacting] = useState(false);
 
+  const hasReacted = currentUserId ? reactedBy.includes(currentUserId) : false;
+  const isOwnPR = currentUserId === record.userId;
+  const reactionCount = reactedBy.length;
+
   const handleReact = async () => {
-    if (!record.id || reacting) return;
+    if (!record.id || reacting || !currentUserId || isOwnPR) return;
     setReacting(true);
-    setReactions((r) => r + 1);
+
+    // Optimistic update
+    if (hasReacted) {
+      setReactedBy((prev) => prev.filter((id) => id !== currentUserId));
+    } else {
+      setReactedBy((prev) => [...prev, currentUserId]);
+    }
+
     try {
       await updateDoc(doc(getClientDb(), 'records', record.id), {
-        reactions: increment(1),
+        reactedBy: hasReacted ? arrayRemove(currentUserId) : arrayUnion(currentUserId),
       });
     } catch {
-      setReactions((r) => r - 1);
+      // Rollback
+      if (hasReacted) {
+        setReactedBy((prev) => [...prev, currentUserId]);
+      } else {
+        setReactedBy((prev) => prev.filter((id) => id !== currentUserId));
+      }
     } finally {
       setReacting(false);
     }
@@ -112,18 +129,29 @@ export default function PRCard({ record }: PRCardProps) {
               Proof
             </a>
           )}
-          <button
-            onClick={handleReact}
-            className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium transition-colors ${
-              reactions > 0
-                ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
-                : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70'
-            }`}
-            aria-label="React with fire"
-          >
-            <Flame className="h-3 w-3" />
-            {reactions > 0 && <span>{reactions}</span>}
-          </button>
+          {!isOwnPR && currentUserId && (
+            <button
+              onClick={handleReact}
+              disabled={reacting}
+              className={`flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${
+                hasReacted
+                  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30'
+                  : reactionCount > 0
+                    ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20'
+                    : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/70'
+              }`}
+              aria-label={hasReacted ? 'Remove fire reaction' : 'React with fire'}
+            >
+              <Flame className={`h-3 w-3 ${hasReacted ? 'fill-current' : ''}`} />
+              {reactionCount > 0 && <span>{reactionCount}</span>}
+            </button>
+          )}
+          {(isOwnPR || !currentUserId) && reactionCount > 0 && (
+            <span className="flex items-center gap-1 rounded-full bg-orange-500/10 px-2 py-1 text-[10px] font-medium text-orange-400">
+              <Flame className="h-3 w-3" />
+              {reactionCount}
+            </span>
+          )}
           <button
             onClick={() => {
               const text = `${record.username} hit ${formatScore(record)} on ${record.exerciseName}!`;
