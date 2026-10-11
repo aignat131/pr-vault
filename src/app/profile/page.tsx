@@ -16,6 +16,8 @@ import SettingsModal from '@/components/SettingsModal';
 import ProgressGraphs from '@/components/ProgressGraphs';
 import ValidationRequestButton from '@/components/ValidationRequestButton';
 import UserValidations from '@/components/UserValidations';
+import AuthModal, { type AuthMode } from '@/components/AuthModal';
+import UserAvatar from '@/components/UserAvatar';
 import { categoryStyle, formatScore, useWeightUnit } from '@/lib/utils';
 import { STORAGE_KEYS } from '@/lib/constants';
 import { useRoles } from '@/context/RolesContext';
@@ -61,7 +63,7 @@ function computeStreak(records: PRRecord[]): number {
 }
 
 export default function ProfilePage() {
-  const { user, loading, loginWithGoogle, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { hasAnyRole, userRole } = useRoles();
   const { toast } = useToast();
   const exercises = useExercises();
@@ -79,6 +81,8 @@ export default function ProfilePage() {
   const [pendingValidationCount, setPendingValidationCount] = useState(0);
   const [personalInfoExpanded, setPersonalInfoExpanded] = useState(false);
   const [dateOfBirth, setDateOfBirth] = useState<string | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const closeAuth = useCallback(() => setAuthMode(null), []);
 
   const handleInvite = async () => {
     const url = window.location.origin;
@@ -205,13 +209,22 @@ export default function ProfilePage() {
         <p className="mb-6 text-sm text-white/50">
           Track your calisthenics personal records
         </p>
-        <button
-          onClick={loginWithGoogle}
-          className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-emerald-400"
-        >
-          Continue with Google
-        </button>
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <button
+            onClick={() => setAuthMode('signin')}
+            className="rounded-full bg-emerald-500 px-6 py-3 text-sm font-semibold text-black transition-colors hover:bg-emerald-400"
+          >
+            Sign in
+          </button>
+          <button
+            onClick={() => setAuthMode('signup')}
+            className="rounded-full bg-white/10 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+          >
+            Create account
+          </button>
+        </div>
         <BottomNav onAddPress={() => {}} />
+        {authMode && <AuthModal open initialMode={authMode} onClose={closeAuth} />}
       </div>
     );
   }
@@ -233,10 +246,9 @@ export default function ProfilePage() {
 
       {/* Avatar + info */}
       <div className="flex flex-col items-center px-5 pb-4">
-        <img
-          src={user.photoURL ?? ''}
-          alt="avatar"
-          className="mb-4 h-20 w-20 rounded-full ring-2 ring-emerald-500/40"
+        <UserAvatar
+          user={user}
+          className="mb-4 h-20 w-20 text-3xl ring-2 ring-emerald-500/40"
         />
         <h1 className="text-xl font-black text-white">
           {user.displayName ?? 'Athlete'}

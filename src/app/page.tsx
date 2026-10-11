@@ -11,6 +11,8 @@ import PRCard from '@/components/PRCard';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
 import OnboardingModal from '@/components/OnboardingModal';
+import AuthModal, { type AuthMode } from '@/components/AuthModal';
+import UserAvatar from '@/components/UserAvatar';
 import type { PRRecord } from '@/types';
 import { STORAGE_KEYS } from '@/lib/constants';
 import { categoryStyle, formatScoreUpper, useWeightUnit } from '@/lib/utils';
@@ -18,7 +20,7 @@ import { categoryStyle, formatScoreUpper, useWeightUnit } from '@/lib/utils';
 const DEFAULT_SHOWCASE = ['pull-ups', 'front-lever', 'weighted-pull-ups'];
 
 export default function HomePage() {
-  const { user, loading: authLoading, loginWithGoogle } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const exercises = useExercises();
   const weightUnit = useWeightUnit();
   const [records, setRecords] = useState<PRRecord[]>([]);
@@ -28,6 +30,8 @@ export default function HomePage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showcase, setShowcase] = useState<string[]>(DEFAULT_SHOWCASE);
   const [editingSlot, setEditingSlot] = useState<number | null>(null);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(null);
+  const closeAuth = useCallback(() => setAuthMode(null), []);
 
   // Load showcase config
   useEffect(() => {
@@ -123,15 +127,14 @@ export default function HomePage() {
           </div>
           {user ? (
             <Link href="/profile">
-              <img
-                src={user.photoURL ?? ''}
-                alt="avatar"
-                className="h-10 w-10 rounded-full ring-2 ring-emerald-500/40 transition-opacity hover:opacity-80 md:h-12 md:w-12"
+              <UserAvatar
+                user={user}
+                className="h-10 w-10 text-base ring-2 ring-emerald-500/40 transition-opacity hover:opacity-80 md:h-12 md:w-12"
               />
             </Link>
           ) : (
             <button
-              onClick={loginWithGoogle}
+              onClick={() => setAuthMode('signin')}
               className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-white/20"
             >
               Sign in
@@ -250,10 +253,16 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
-              onClick={loginWithGoogle}
+              onClick={() => setAuthMode('signup')}
               className="rounded-full bg-emerald-500 px-8 py-3 text-sm font-bold text-black transition-all hover:bg-emerald-400 active:scale-95"
             >
-              Sign in with Google
+              Create account
+            </button>
+            <button
+              onClick={() => setAuthMode('signin')}
+              className="rounded-full bg-white/10 px-8 py-3 text-sm font-bold text-white transition-all hover:bg-white/20 active:scale-95"
+            >
+              Sign in
             </button>
           </div>
           <div className="mt-10 grid w-full max-w-xs grid-cols-3 gap-4 text-center md:max-w-sm">
@@ -283,6 +292,7 @@ export default function HomePage() {
       {/* Bottom Nav + Modals */}
       <BottomNav onAddPress={() => setModalOpen(true)} />
       <AddPRModal open={modalOpen} onClose={() => setModalOpen(false)} onSave={() => setRefreshKey((k) => k + 1)} />
+      {authMode && <AuthModal open initialMode={authMode} onClose={closeAuth} />}
       <OnboardingModal
         open={showOnboarding}
         onComplete={() => setShowOnboarding(false)}

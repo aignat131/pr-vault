@@ -52,8 +52,9 @@ export function RolesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Fast path: owner email check (zero Firestore reads)
-    if (user.email === OWNER_EMAIL) {
+    // Fast path: owner email check (zero Firestore reads).
+    // Must be verified — anyone can register an unverified email/password account.
+    if (user.email === OWNER_EMAIL && user.emailVerified) {
       setUserRole('owner');
       setRoleLoading(false);
       return;

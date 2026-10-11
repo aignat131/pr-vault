@@ -9,7 +9,8 @@ service cloud.firestore {
     }
 
     function isOwnerEmail() {
-      return request.auth.token.email == 'aignat131@gmail.com';
+      return request.auth.token.email == 'aignat131@gmail.com'
+        && request.auth.token.email_verified == true;
     }
 
     function hasRoleDoc() {
