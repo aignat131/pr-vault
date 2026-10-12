@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { X, Loader2, Search } from 'lucide-react';
-import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, setDoc, deleteDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { getClientDb } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useExercises } from '@/context/ExercisesContext';
 import { STORAGE_KEYS } from '@/lib/constants';
-import { categoryStyle, useWeightUnit } from '@/lib/utils';
+import { categoryStyle, useWeightUnit, partitionDuplicates, recordKey } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 import { useEscapeClose } from '@/lib/useEscapeClose';
 import confetti from 'canvas-confetti';
-import type { Exercise } from '@/types';
+import type { Exercise, PRRecord } from '@/types';
 
 interface AddPRModalProps {
   open: boolean;
@@ -33,6 +33,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const submittingRef = useRef(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -73,6 +74,9 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
       return;
     }
 
+    // Guard against double-submits creating duplicate records
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError('');
 
@@ -86,7 +90,12 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
       const existingSnap = await getDocs(existingQuery);
 
       if (!existingSnap.empty) {
-        const existingDoc = existingSnap.docs[0];
+        // Keep the best record and remove any stray duplicates
+        const { keep, duplicates } = partitionDuplicates(
+          existingSnap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord),
+        );
+        await Promise.all(duplicates.map((r) => deleteDoc(doc(getClientDb(), 'records', r.id!))));
+        const existingDoc = existingSnap.docs.find((d) => d.id === keep[0].id)!;
         const existingScore = existingDoc.data().score as number;
 
         if (numScore <= existingScore) {
@@ -137,8 +146,8 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
         const userGender = genderProp ?? localStorage.getItem(STORAGE_KEYS.GENDER) ?? null;
         const now = Timestamp.now();
 
-        // Create new record
-        await addDoc(collection(getClientDb(), 'records'), {
+        // Create new record with a deterministic ID so there can only ever be one per user+exercise
+        await setDoc(doc(getClientDb(), 'records', recordKey({ userId: user.uid, exerciseId: selectedExercise.id })), {
           userId: user.uid,
           username: user.displayName ?? 'Anonymous',
           userAvatar: user.photoURL ?? null,
@@ -179,6 +188,7 @@ export default function AddPRModal({ open, onClose, onSave, gender: genderProp, 
       toast('Failed to save PR.', 'error');
       setError(err instanceof Error ? err.message : 'Failed to save PR.');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   }, [user, score, addedWeight, videoUrl, selectedExercise, onClose, onSave, genderProp, toast]);

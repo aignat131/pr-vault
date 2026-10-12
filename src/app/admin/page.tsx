@@ -38,7 +38,7 @@ import { useRoles } from '@/context/RolesContext';
 import { useExercisesContext } from '@/context/ExercisesContext';
 import { EXERCISES as DEFAULT_EXERCISES, type ExerciseCategory } from '@/types';
 import type { PRRecord } from '@/types';
-import { formatScore, formatDateFull as formatDate, categoryStyle } from '@/lib/utils';
+import { formatScore, formatDateFull as formatDate, categoryStyle, partitionDuplicates } from '@/lib/utils';
 import TeamTab from '@/components/admin/TeamTab';
 import FeedbackTab from '@/components/admin/FeedbackTab';
 import ValidationTab from '@/components/admin/ValidationTab';
@@ -75,6 +75,10 @@ export default function AdminPage() {
   // Form review state
   const [videoRecords, setVideoRecords] = useState<PRRecord[]>([]);
   const [reviewLoading, setReviewLoading] = useState(false);
+
+  // Duplicate cleanup state
+  const [cleaning, setCleaning] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState('');
 
   const defaultIds = new Set(DEFAULT_EXERCISES.map((e) => e.id));
 
@@ -171,6 +175,27 @@ export default function AdminPage() {
     }
   };
 
+  const handleRemoveDuplicates = async () => {
+    setCleaning(true);
+    setCleanupResult('');
+    try {
+      const snap = await getDocs(collection(getClientDb(), 'records'));
+      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
+      const { duplicates } = partitionDuplicates(all);
+      await Promise.all(duplicates.map((r) => deleteDoc(doc(getClientDb(), 'records', r.id!))));
+      setCleanupResult(
+        duplicates.length === 0
+          ? 'No duplicates found.'
+          : `Removed ${duplicates.length} duplicate record${duplicates.length === 1 ? '' : 's'}.`,
+      );
+    } catch (err) {
+      console.error('[Admin] Failed to remove duplicates:', err);
+      setCleanupResult('Failed to remove duplicates.');
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   const handleVerify = async (recordId: string, verified: boolean) => {
     try {
       await updateDoc(doc(getClientDb(), 'records', recordId), {
@@ -248,6 +273,27 @@ export default function AdminPage() {
       {/* Exercises Tab */}
       {activeTab === 'exercises' && canManageExercises && (
         <section className="px-5 space-y-5">
+          {/* Duplicate record cleanup (owner only) */}
+          {isOwner && (
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+              <h3 className="mb-1 text-sm font-semibold text-white">Duplicate Records</h3>
+              <p className="mb-3 text-xs text-white/40">
+                Keeps one record per user per exercise (the best score) and deletes the rest.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRemoveDuplicates}
+                  disabled={cleaning}
+                  className="flex items-center gap-2 rounded-xl bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/25 disabled:opacity-50"
+                >
+                  {cleaning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Remove duplicates
+                </button>
+                {cleanupResult && <p className="text-xs text-white/50">{cleanupResult}</p>}
+              </div>
+            </div>
+          )}
+
           {/* Add exercise form */}
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
             <h3 className="mb-3 text-sm font-semibold text-white">Add Exercise</h3>

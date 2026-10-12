@@ -98,3 +98,37 @@ export const categoryStyle: Record<
     label: 'Weighted',
   },
 } as const;
+
+/** Key identifying a user's single PR slot for an exercise. */
+export function recordKey(r: Pick<PRRecord, 'userId' | 'exerciseId'>): string {
+  return `${r.userId}_${r.exerciseId}`;
+}
+
+/** Ranks two records for the same user+exercise; negative means `a` should be kept over `b`. */
+function compareForKeep(a: PRRecord, b: PRRecord): number {
+  return (
+    (b.score ?? 0) - (a.score ?? 0) ||
+    Number(!!b.validated || !!b.formVerified) - Number(!!a.validated || !!a.formVerified) ||
+    (b.reactedBy?.length ?? 0) - (a.reactedBy?.length ?? 0) ||
+    (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0)
+  );
+}
+
+/** Splits records into the one to keep per user+exercise and the duplicates to remove. */
+export function partitionDuplicates(records: PRRecord[]): { keep: PRRecord[]; duplicates: PRRecord[] } {
+  const groups = new Map<string, PRRecord[]>();
+  for (const r of records) {
+    const key = recordKey(r);
+    const group = groups.get(key);
+    if (group) group.push(r);
+    else groups.set(key, [r]);
+  }
+  const keep: PRRecord[] = [];
+  const duplicates: PRRecord[] = [];
+  for (const group of groups.values()) {
+    const [best, ...rest] = [...group].sort(compareForKeep);
+    keep.push(best);
+    duplicates.push(...rest);
+  }
+  return { keep, duplicates };
+}

@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import PRCard from '@/components/PRCard';
 import BottomNav from '@/components/BottomNav';
 import AddPRModal from '@/components/AddPRModal';
+import { recordKey } from '@/lib/utils';
 import type { PRRecord, ExerciseCategory } from '@/types';
 
 function formatRelativeTime(seconds: number): string {
@@ -60,7 +61,18 @@ export default function HistoryPage() {
       const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as PRRecord);
       setHasMore(snap.docs.length === PAGE_SIZE);
       setLastDoc(snap.docs[snap.docs.length - 1] ?? null);
-      setRecords((prev) => reset ? docs : [...prev, ...docs]);
+      // One entry per user+exercise; newest-first ordering means the first seen wins
+      setRecords((prev) => {
+        const base = reset ? [] : prev;
+        const seen = new Set(base.map(recordKey));
+        const fresh = docs.filter((r) => {
+          const key = recordKey(r);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return [...base, ...fresh];
+      });
     } catch (err) {
       console.error('[History] Firestore query failed:', err);
     } finally {
